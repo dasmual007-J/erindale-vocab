@@ -2,124 +2,143 @@
 <html lang="ko">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
-<title>에린데일 단어 암기</title>
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover, user-scalable=no">
+<title>단어 암기</title>
 <meta name="theme-color" content="#1d6e5a">
 <link rel="manifest" href="manifest.json">
 <link rel="apple-touch-icon" href="icon-192.png">
 <style>
   :root {
-    --bg: #f6f4ef;
-    --card: #ffffff;
-    --ink: #2c2c2a;
-    --sub: #6b6a64;
-    --line: #e3e0d8;
-    --accent: #1d6e5a;
-    --accent-soft: #e1f0ea;
-    --warn: #b8542e;
-    --warn-soft: #f8e9e2;
-    --blue: #2d6aa3;
-    --blue-soft: #e6effa;
+    --bg: #f6f4ef; --card: #fff; --ink: #2c2c2a; --sub: #6b6a64; --line: #e3e0d8;
+    --accent: #1d6e5a; --accent-soft: #e1f0ea;
+    --warn: #b8542e; --warn-soft: #f8e9e2;
+    --blue: #2d6aa3; --blue-soft: #e6effa;
     --radius: 14px;
   }
   * { margin: 0; padding: 0; box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
-  body {
-    font-family: "Pretendard", "Malgun Gothic", "Apple SD Gothic Neo", sans-serif;
-    background: var(--bg); color: var(--ink);
-    min-height: 100vh; font-size: 16px; line-height: 1.6;
-  }
-  #app { max-width: 520px; margin: 0 auto; padding: 16px 16px 90px; }
+  body { font-family: "Pretendard", "Malgun Gothic", "Apple SD Gothic Neo", sans-serif;
+    background: var(--bg); color: var(--ink); font-size: 16px; line-height: 1.6; }
+  #app { max-width: 520px; margin: 0 auto; padding: 16px 16px 96px; }
 
-  header.top { display: flex; align-items: baseline; justify-content: space-between; padding: 8px 2px 16px; }
+  header.top { display: flex; align-items: baseline; justify-content: space-between; padding: 8px 2px 14px; }
   header.top h1 { font-size: 20px; font-weight: 700; }
   header.top .streak { font-size: 14px; color: var(--sub); }
 
   .card { background: var(--card); border: 1px solid var(--line); border-radius: var(--radius); padding: 18px; margin-bottom: 14px; }
   .card h2 { font-size: 15px; font-weight: 700; margin-bottom: 10px; color: var(--sub); }
 
-  .big-btns { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
-  .big-btn { border: none; border-radius: var(--radius); padding: 18px 14px; text-align: left; cursor: pointer; font-family: inherit; }
-  .big-btn .num { font-size: 30px; font-weight: 800; display: block; }
-  .big-btn .lbl { font-size: 14px; }
-  .big-btn.learn { background: var(--accent-soft); color: var(--accent); }
-  .big-btn.review { background: var(--blue-soft); color: var(--blue); }
-  .big-btn:disabled { opacity: .45; cursor: default; }
-
-  .setlist { display: flex; flex-direction: column; gap: 8px; }
-  .setrow { display: flex; align-items: center; gap: 10px; font-size: 14px; }
-  .setrow .name { flex: 0 0 128px; }
-  .bar { flex: 1; height: 8px; background: var(--line); border-radius: 4px; overflow: hidden; }
-  .bar i { display: block; height: 100%; background: var(--accent); border-radius: 4px; }
-  .setrow .pct { flex: 0 0 64px; text-align: right; color: var(--sub); font-size: 12px; }
-
-  nav.tabs {
-    position: fixed; bottom: 0; left: 0; right: 0;
-    background: var(--card); border-top: 1px solid var(--line);
-    display: flex; justify-content: space-around; padding: 8px 0 max(8px, env(safe-area-inset-bottom));
-  }
-  nav.tabs button {
-    background: none; border: none; font-family: inherit; font-size: 12px; color: var(--sub);
-    cursor: pointer; padding: 4px 12px; border-radius: 8px;
-  }
-  nav.tabs button .ico { display: block; font-size: 20px; }
-  nav.tabs button.on { color: var(--accent); font-weight: 700; }
-
-  /* 학습/복습 화면 */
-  .session-head { display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; font-size: 13px; color: var(--sub); }
-  .session-head button { background: none; border: none; color: var(--sub); font-family: inherit; font-size: 13px; cursor: pointer; text-decoration: underline; }
-  .progress { height: 6px; background: var(--line); border-radius: 3px; overflow: hidden; margin-bottom: 18px; }
-  .progress i { display: block; height: 100%; background: var(--accent); transition: width .25s; }
-
-  .word-card { background: var(--card); border: 1px solid var(--line); border-radius: var(--radius); padding: 26px 20px; text-align: center; }
-  .word-card .step-tag { display: inline-block; font-size: 12px; font-weight: 700; padding: 3px 10px; border-radius: 999px; background: var(--accent-soft); color: var(--accent); margin-bottom: 14px; }
-  .word-card .word { font-size: 34px; font-weight: 800; letter-spacing: .5px; }
-  .word-card .pos { font-size: 13px; color: var(--sub); margin-top: 2px; }
-  .word-card .example { font-size: 16px; margin-top: 14px; color: var(--ink); }
-  .word-card .example b { color: var(--accent); }
-  .word-card .meaning { font-size: 22px; font-weight: 700; margin-top: 14px; color: var(--accent); }
-  .word-card .hint { font-size: 14px; color: var(--sub); margin-top: 10px; background: var(--bg); border-radius: 10px; padding: 10px 12px; display: inline-block; }
-  .speak-btn { border: 1px solid var(--line); background: var(--card); border-radius: 999px; font-size: 20px; width: 46px; height: 46px; cursor: pointer; margin-top: 14px; }
-  .speak-btn:active { background: var(--accent-soft); }
-
-  .actions { display: flex; flex-direction: column; gap: 10px; margin-top: 18px; }
-  .btn { font-family: inherit; font-size: 16px; font-weight: 700; padding: 14px; border-radius: 12px; border: none; cursor: pointer; }
+  .btn { font-family: inherit; font-size: 16px; font-weight: 700; padding: 14px; border-radius: 12px; border: none; cursor: pointer; width: 100%; }
   .btn.primary { background: var(--accent); color: #fff; }
+  .btn.blue { background: var(--blue); color: #fff; }
   .btn.ghost { background: var(--card); border: 1px solid var(--line); color: var(--ink); }
   .btn.warn { background: var(--warn-soft); color: var(--warn); }
+  .btn:disabled { opacity: .45; cursor: default; }
+  .actions { display: flex; flex-direction: column; gap: 10px; margin-top: 18px; }
 
-  .say-counter { display: flex; justify-content: center; gap: 8px; margin-top: 16px; }
-  .say-dot { width: 34px; height: 34px; border-radius: 50%; border: 2px solid var(--line); display: flex; align-items: center; justify-content: center; font-size: 15px; color: var(--sub); }
+  .hero { background: var(--card); border: 1px solid var(--line); border-radius: var(--radius); padding: 18px; margin-bottom: 14px; }
+  .hero .label { font-size: 13px; color: var(--sub); }
+  .hero .title { font-size: 18px; font-weight: 700; margin: 2px 0 12px; }
+  .hero .count { display: flex; align-items: baseline; gap: 6px; margin-bottom: 8px; }
+  .hero .count b { font-size: 30px; font-weight: 800; color: var(--accent); }
+  .bar { height: 9px; background: var(--line); border-radius: 5px; overflow: hidden; }
+  .bar i { display: block; height: 100%; background: var(--accent); border-radius: 5px; transition: width .3s; }
+
+  .row2 { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+  .tile { border: none; border-radius: var(--radius); padding: 16px 14px; text-align: left; cursor: pointer; font-family: inherit; }
+  .tile .num { font-size: 26px; font-weight: 800; display: block; line-height: 1.2; }
+  .tile .lbl { font-size: 13px; }
+  .tile.rev { background: var(--blue-soft); color: var(--blue); }
+  .tile.shot { background: var(--accent-soft); color: var(--accent); }
+  .tile:disabled { opacity: .45; cursor: default; }
+
+  nav.tabs { position: fixed; bottom: 0; left: 0; right: 0; background: var(--card);
+    border-top: 1px solid var(--line); display: flex; justify-content: space-around;
+    padding: 8px 0 max(8px, env(safe-area-inset-bottom)); z-index: 10; }
+  nav.tabs button { background: none; border: none; font-family: inherit; font-size: 11px;
+    color: var(--sub); cursor: pointer; padding: 4px 10px; }
+  nav.tabs button .ico { display: block; font-size: 19px; }
+  nav.tabs button.on { color: var(--accent); font-weight: 700; }
+
+  .session-head { display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px; font-size: 13px; color: var(--sub); }
+  .session-head button { background: none; border: none; color: var(--sub); font-family: inherit; font-size: 13px; cursor: pointer; text-decoration: underline; }
+  .progress { height: 6px; background: var(--line); border-radius: 3px; overflow: hidden; margin-bottom: 16px; }
+  .progress i { display: block; height: 100%; background: var(--accent); transition: width .25s; }
+
+  .word-card { background: var(--card); border: 1px solid var(--line); border-radius: var(--radius); padding: 24px 18px; text-align: center; }
+  .step-tag { display: inline-block; font-size: 12px; font-weight: 700; padding: 3px 10px; border-radius: 999px; background: var(--accent-soft); color: var(--accent); margin-bottom: 12px; }
+  .step-tag.b { background: var(--blue-soft); color: var(--blue); }
+  .word { font-size: 33px; font-weight: 800; letter-spacing: .3px; word-break: break-word; }
+  .ipa { font-size: 14px; color: var(--sub); margin-top: 2px; }
+  .pos { font-size: 13px; color: var(--sub); }
+  .example { font-size: 16px; margin-top: 13px; }
+  .example b { color: var(--accent); }
+  .meaning { font-size: 22px; font-weight: 700; margin-top: 12px; color: var(--accent); }
+  .hint { font-size: 14px; color: var(--sub); margin-top: 10px; background: var(--bg); border-radius: 10px; padding: 10px 12px; display: inline-block; text-align: left; }
+  .speak-btn { border: 1px solid var(--line); background: var(--card); border-radius: 999px; font-size: 20px; width: 46px; height: 46px; cursor: pointer; margin-top: 13px; }
+  .speak-btn:active { background: var(--accent-soft); }
+  .mstars { margin-top: 10px; font-size: 15px; letter-spacing: 3px; color: var(--accent); }
+
+  .say-counter { display: flex; justify-content: center; gap: 8px; margin-top: 14px; }
+  .say-dot { width: 34px; height: 34px; border-radius: 50%; border: 2px solid var(--line);
+    display: flex; align-items: center; justify-content: center; font-size: 15px; color: var(--sub); }
   .say-dot.done { background: var(--accent); border-color: var(--accent); color: #fff; }
 
-  .choices { display: flex; flex-direction: column; gap: 10px; margin-top: 18px; }
-  .choice { font-family: inherit; text-align: left; font-size: 16px; padding: 13px 15px; border-radius: 12px; border: 1px solid var(--line); background: var(--card); cursor: pointer; }
+  .choices { display: flex; flex-direction: column; gap: 10px; margin-top: 16px; }
+  .choice { font-family: inherit; text-align: left; font-size: 16px; padding: 13px 15px; border-radius: 12px;
+    border: 1px solid var(--line); background: var(--card); cursor: pointer; width: 100%; }
   .choice.right { background: var(--accent-soft); border-color: var(--accent); color: var(--accent); font-weight: 700; }
   .choice.wrong { background: var(--warn-soft); border-color: var(--warn); color: var(--warn); }
-  .choice:disabled { cursor: default; }
 
-  .summary { text-align: center; padding: 30px 10px; }
-  .summary .emoji { font-size: 44px; }
-  .summary h2 { font-size: 20px; margin: 12px 0 6px; color: var(--ink); }
+  .summary { text-align: center; padding: 26px 10px; }
+  .summary .emoji { font-size: 46px; }
+  .summary h2 { font-size: 20px; margin: 10px 0 6px; color: var(--ink); }
   .summary p { color: var(--sub); font-size: 14px; }
+
+  /* 촬영 / 확인 */
+  .shot-zone { border: 2px dashed var(--line); border-radius: var(--radius); padding: 34px 18px; text-align: center; background: var(--card); }
+  .shot-zone .big { font-size: 46px; }
+  .shot-zone p { color: var(--sub); font-size: 14px; margin-top: 6px; }
+  .loading { text-align: center; padding: 40px 16px; }
+  .spinner { width: 40px; height: 40px; margin: 0 auto 16px; border: 4px solid var(--line);
+    border-top-color: var(--accent); border-radius: 50%; animation: spin 1s linear infinite; }
+  @keyframes spin { to { transform: rotate(360deg); } }
+
+  .edit-row { display: flex; gap: 8px; align-items: center; padding: 8px 0; border-bottom: 1px solid var(--line); }
+  .edit-row input { font-family: inherit; font-size: 15px; padding: 8px 9px; border: 1px solid var(--line);
+    border-radius: 8px; background: var(--card); min-width: 0; }
+  .edit-row .w { flex: 0 0 38%; font-weight: 700; }
+  .edit-row .m { flex: 1; }
+  .edit-row .del { flex: 0 0 30px; background: none; border: none; color: var(--warn); font-size: 18px; cursor: pointer; }
 
   .stat-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
   .stat { background: var(--card); border: 1px solid var(--line); border-radius: var(--radius); padding: 14px; }
-  .stat .v { font-size: 26px; font-weight: 800; }
+  .stat .v { font-size: 25px; font-weight: 800; }
   .stat .k { font-size: 12px; color: var(--sub); }
 
-  .setting-row { display: flex; justify-content: space-between; align-items: center; padding: 10px 0; border-bottom: 1px solid var(--line); font-size: 15px; }
+  .listrow { display: flex; align-items: center; gap: 10px; padding: 11px 0; border-bottom: 1px solid var(--line); }
+  .listrow:last-child { border-bottom: none; }
+  .listrow .info { flex: 1; min-width: 0; }
+  .listrow .nm { font-size: 15px; font-weight: 700; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .listrow .sub { font-size: 12px; color: var(--sub); }
+  .listrow .go { background: var(--accent-soft); color: var(--accent); border: none; font-family: inherit;
+    font-size: 13px; font-weight: 700; padding: 8px 13px; border-radius: 9px; cursor: pointer; white-space: nowrap; }
+  .listrow .go.gray { background: var(--bg); color: var(--sub); }
+
+  .setting-row { display: flex; justify-content: space-between; align-items: center; gap: 10px; padding: 11px 0; border-bottom: 1px solid var(--line); font-size: 15px; }
   .setting-row:last-child { border-bottom: none; }
-  .setting-row select, .setting-row input[type=number] { font-family: inherit; font-size: 15px; padding: 6px 8px; border: 1px solid var(--line); border-radius: 8px; background: var(--card); }
-  .chkline { display: flex; align-items: center; gap: 8px; padding: 6px 0; font-size: 15px; }
+  select, input[type=number], input[type=password], input[type=text] { font-family: inherit; font-size: 15px;
+    padding: 8px 9px; border: 1px solid var(--line); border-radius: 8px; background: var(--card); color: var(--ink); }
   .muted { color: var(--sub); font-size: 13px; }
   .danger-link { color: var(--warn); background: none; border: none; font-family: inherit; font-size: 14px; text-decoration: underline; cursor: pointer; padding: 0; }
+  .notice { background: var(--warn-soft); color: var(--warn); border-radius: 10px; padding: 11px 13px; font-size: 14px; margin-bottom: 12px; }
+  .ok-notice { background: var(--accent-soft); color: var(--accent); border-radius: 10px; padding: 11px 13px; font-size: 14px; margin-bottom: 12px; }
 </style>
 </head>
 <body>
 <div id="app"></div>
 <nav class="tabs" id="tabs"></nav>
+<input type="file" id="camIn" accept="image/*" capture="environment" style="display:none">
 
-<!-- 단어 데이터 -->
 <script src="data/set_a.js"></script>
 <script src="data/set_a1.js"></script>
 <script src="data/set_b.js"></script>
@@ -134,412 +153,708 @@
 
 <script>
 "use strict";
-/* ================= 데이터 준비 ================= */
-const SET_ORDER = ["A","A1","B","B1","C","C1","D","D1","E","E1","F"];
-const DATA = window.VOCAB_DATA || {};
-const ALL = []; // {id, set, setName, w, m, p, e, h}
-for (const sid of SET_ORDER) {
-  const s = DATA[sid];
-  if (!s || !Array.isArray(s.cards)) continue;
-  s.cards.forEach((c, i) => ALL.push({ id: sid + "#" + i, set: sid, setName: s.name, ...c }));
+
+/* ========== 내장 자료 ========== */
+const BUILTIN_ORDER = ["A","A1","B","B1","C","C1","D","D1","E","E1","F"];
+const BUILTIN = window.VOCAB_DATA || {};
+const DICT = {};   // 자동완성 사전: word(소문자) -> {m,p,e,h}
+for (const sid of BUILTIN_ORDER) {
+  const s = BUILTIN[sid]; if (!s) continue;
+  for (const c of s.cards) if (!DICT[c.w.toLowerCase()]) DICT[c.w.toLowerCase()] = { m: c.m, p: c.p, e: c.e, h: c.h };
 }
 
-/* ================= 상태 저장 ================= */
-const KEY = "erindale-vocab-v1";
+/* ========== 저장소 ========== */
+const KEY = "vocab-app-v2";
 let S = load();
 function load() {
-  try { const raw = localStorage.getItem(KEY); if (raw) return JSON.parse(raw); } catch (e) {}
+  try { const r = localStorage.getItem(KEY); if (r) return migrate(JSON.parse(r)); } catch (e) {}
+  return fresh();
+}
+function fresh() {
   return {
-    settings: { newPerDay: 10, ttsRate: 0.9, activeSets: [...SET_ORDER] },
-    cards: {},          // id -> {st, ef, iv, due, reps, lapses}
-    streak: 0, lastDay: null,
-    doneNewToday: 0, doneNewDay: null,
+    settings: { newPerDay: 10, ttsRate: 0.9, apiKey: "", model: "claude-haiku-4-5", mastery: 3, useDictApi: true },
+    batches: {},        // id -> {id,name,created,cards:[{w,m,p,e,h,ipa,audio}],done,doneAt}
+    active: null,       // 현재 학습 중 묶음 id
+    prog: {},           // "batchId#idx" -> {seen,streak,mastered,iv,due,ef,reps,lapses}
+    userDict: {},       // 사용자가 입력/생성한 단어 누적
+    streak: 0, lastDay: null, newDay: null, newCount: 0,
   };
 }
-function save() { localStorage.setItem(KEY, JSON.stringify(S)); }
-function today() { const d = new Date(); return d.getFullYear() + "-" + String(d.getMonth()+1).padStart(2,"0") + "-" + String(d.getDate()).padStart(2,"0"); }
-function addDays(n) { const d = new Date(); d.setDate(d.getDate() + n); return d.getFullYear() + "-" + String(d.getMonth()+1).padStart(2,"0") + "-" + String(d.getDate()).padStart(2,"0"); }
+function migrate(s) { const f = fresh(); return { ...f, ...s, settings: { ...f.settings, ...(s.settings || {}) } }; }
+function save() { try { localStorage.setItem(KEY, JSON.stringify(S)); } catch (e) { alert("저장 공간이 부족합니다. 보관함에서 오래된 묶음을 삭제해 주세요."); } }
+function dstr(d) { return d.getFullYear() + "-" + String(d.getMonth()+1).padStart(2,"0") + "-" + String(d.getDate()).padStart(2,"0"); }
+function today() { return dstr(new Date()); }
+function addDays(n) { const d = new Date(); d.setDate(d.getDate() + n); return dstr(d); }
+function lookup(w) { const k = w.toLowerCase().trim(); return S.userDict[k] || DICT[k] || null; }
 
 function touchStreak() {
-  const t = today();
-  if (S.lastDay === t) return;
+  const t = today(); if (S.lastDay === t) return;
   const y = new Date(); y.setDate(y.getDate() - 1);
-  const yStr = y.getFullYear() + "-" + String(y.getMonth()+1).padStart(2,"0") + "-" + String(y.getDate()).padStart(2,"0");
-  S.streak = (S.lastDay === yStr) ? S.streak + 1 : 1;
-  S.lastDay = t;
-  save();
+  S.streak = (S.lastDay === dstr(y)) ? S.streak + 1 : 1;
+  S.lastDay = t; save();
 }
-function newQuotaLeft() {
-  if (S.doneNewDay !== today()) { S.doneNewDay = today(); S.doneNewToday = 0; save(); }
-  return Math.max(0, S.settings.newPerDay - S.doneNewToday);
+function newLeft() {
+  if (S.newDay !== today()) { S.newDay = today(); S.newCount = 0; save(); }
+  return Math.max(0, S.settings.newPerDay - S.newCount);
 }
 
-/* ================= SRS (SM-2 간소화) ================= */
+/* ========== 묶음 / 진행도 ========== */
+function P(bid, i) {
+  const k = bid + "#" + i;
+  if (!S.prog[k]) S.prog[k] = { seen: false, streak: 0, mastered: false, iv: 0, due: null, ef: 2.5, reps: 0, lapses: 0 };
+  return S.prog[k];
+}
+function batchStats(b) {
+  let mastered = 0, seen = 0;
+  b.cards.forEach((c, i) => { const p = S.prog[b.id + "#" + i]; if (p) { if (p.mastered) mastered++; if (p.seen) seen++; } });
+  return { total: b.cards.length, mastered, seen, left: b.cards.length - mastered };
+}
+function activeBatch() { return S.active ? S.batches[S.active] : null; }
+
 const LADDER = [1, 3, 7, 30];
-function gradeCard(id, correct) {
-  const c = S.cards[id] || { st: "new", ef: 2.5, iv: 0, due: null, reps: 0, lapses: 0 };
+function gradeReview(bid, i, correct) {
+  const p = P(bid, i);
   if (correct) {
-    c.reps++;
-    const idx = LADDER.indexOf(c.iv);
-    if (c.iv === 0) c.iv = 1;
-    else if (idx >= 0 && idx < LADDER.length - 1) c.iv = LADDER[idx + 1];
-    else c.iv = Math.round(c.iv * c.ef);
-    c.ef = Math.min(2.8, c.ef + 0.05);
-    c.st = "rev";
+    p.reps++;
+    const idx = LADDER.indexOf(p.iv);
+    if (p.iv === 0) p.iv = 1;
+    else if (idx >= 0 && idx < LADDER.length - 1) p.iv = LADDER[idx + 1];
+    else p.iv = Math.round(p.iv * p.ef);
+    p.ef = Math.min(2.8, p.ef + 0.05);
   } else {
-    c.lapses++;
-    c.iv = 1;
-    c.ef = Math.max(1.3, c.ef - 0.2);
-    c.st = "rev";
+    p.lapses++; p.iv = 1; p.ef = Math.max(1.3, p.ef - 0.2);
   }
-  c.due = addDays(c.iv);
-  S.cards[id] = c;
+  p.due = addDays(p.iv); save();
+}
+function dueList() {
+  const t = today(), out = [];
+  for (const b of Object.values(S.batches)) {
+    if (!b.done) continue;
+    b.cards.forEach((c, i) => { const p = S.prog[b.id + "#" + i]; if (p && p.due && p.due <= t) out.push({ b, i, c }); });
+  }
+  return out;
+}
+function finishBatch(b) {
+  b.done = true; b.doneAt = today();
+  b.cards.forEach((c, i) => { const p = P(b.id, i); if (!p.due) { p.iv = 1; p.due = addDays(1); } });
+  if (S.active === b.id) S.active = null;
   save();
 }
-function dueCards() {
-  const t = today();
-  return ALL.filter(c => S.settings.activeSets.includes(c.set) && S.cards[c.id] && S.cards[c.id].due && S.cards[c.id].due <= t);
-}
-function newCandidates(n) {
-  return ALL.filter(c => S.settings.activeSets.includes(c.set) && !S.cards[c.id]).slice(0, n);
-}
-function longTermCount() { // 30일 이상 간격 도달 = 장기기억 전환으로 간주
-  return Object.values(S.cards).filter(c => c.iv >= 30).length;
-}
 
-/* ================= TTS ================= */
+/* ========== 발음 ========== */
 let VOICE = null;
-function pickVoice() {
-  const vs = speechSynthesis.getVoices().filter(v => v.lang && v.lang.startsWith("en"));
-  VOICE = vs.find(v => v.lang === "en-US") || vs[0] || null;
+function pickVoice() { const v = speechSynthesis.getVoices().filter(x => x.lang && x.lang.startsWith("en")); VOICE = v.find(x => x.lang === "en-US") || v[0] || null; }
+if ("speechSynthesis" in window) { pickVoice(); speechSynthesis.onvoiceschanged = pickVoice; }
+let AUDIO = null;
+function speak(text, audioUrl) {
+  if (audioUrl) {
+    try { if (AUDIO) AUDIO.pause(); AUDIO = new Audio(audioUrl); AUDIO.play().catch(() => ttsSpeak(text)); return; } catch (e) {}
+  }
+  ttsSpeak(text);
 }
-if ("speechSynthesis" in window) {
-  pickVoice();
-  speechSynthesis.onvoiceschanged = pickVoice;
-}
-function speak(text) {
+function ttsSpeak(text) {
   if (!("speechSynthesis" in window)) return;
   speechSynthesis.cancel();
-  const u = new SpeechSynthesisUtterance(text.replace(/\(.*?\)/g, "").split("/")[0]);
-  u.lang = "en-US"; if (VOICE) u.voice = VOICE;
-  u.rate = S.settings.ttsRate;
+  const u = new SpeechSynthesisUtterance(String(text).replace(/\(.*?\)/g, "").split("/")[0].trim());
+  u.lang = "en-US"; if (VOICE) u.voice = VOICE; u.rate = S.settings.ttsRate;
   speechSynthesis.speak(u);
 }
 
-/* ================= 공용 렌더 ================= */
+/* ========== 영어 사전 API (무료, 키 불필요) ========== */
+async function fetchEnInfo(word) {
+  if (!S.settings.useDictApi) return null;
+  try {
+    const r = await fetch("https://api.dictionaryapi.dev/api/v2/entries/en/" + encodeURIComponent(word.split("/")[0].trim()));
+    if (!r.ok) return null;
+    const j = await r.json(); const e = j[0]; if (!e) return null;
+    return {
+      ipa: (e.phonetics.find(p => p.text) || {}).text || "",
+      audio: (e.phonetics.find(p => p.audio) || {}).audio || "",
+    };
+  } catch (e) { return null; }
+}
+async function enrichBatch(b) {
+  for (let i = 0; i < b.cards.length; i++) {
+    const c = b.cards[i];
+    if (c.ipa !== undefined) continue;
+    const info = await fetchEnInfo(c.w);
+    c.ipa = info ? info.ipa : ""; c.audio = info ? info.audio : "";
+    if (i % 10 === 0) save();
+  }
+  save();
+}
+
+/* ========== Claude API: 사진 → 카드 ========== */
+const SHOT_PROMPT = `이 사진은 영어 단어 학습 자료입니다. 사진에 보이는 영어 단어를 빠짐없이 찾아 한국 중·고등학생용 학습 카드로 만들어 주세요.
+
+각 카드 규칙:
+- w: 영어 단어. 사진에 있는 철자 그대로, 정확하게.
+- m: 한국어 뜻 1~3개를 쉼표로 구분. 사진에 한국어 뜻이 적혀 있으면 그것을 우선 쓰되, 명백한 오탈자나 인식 오류는 표준 뜻으로 바로잡을 것. 뜻이 없으면 표준 뜻을 직접 작성.
+- p: 품사 (동사 / 명사 / 형용사 / 부사 / 연결어 등). 두 품사면 "명사/동사"처럼.
+- e: 그 단어가 들어간 8~12단어의 자연스러운 영어 예문. 중·고등학생 수준.
+- h: 어원 분해(예: "medi(중간)+ate → 중간에 서서 화해시키다") 또는 짧은 연상법. 한국어 40자 이내. 아주 쉬운 단어는 빈 문자열.
+- title: 이 자료를 알아볼 짧은 제목 (예: "에린데일 A 시험지", "수능 빈출 동사").
+
+번호·표 선·머리글은 무시하고 영어 단어만 추출하세요. 같은 단어가 여러 번 나오면 한 번만 넣으세요. 한국어 단어나 사람 이름은 넣지 마세요.`;
+
+function resizeToB64(file, maxSide) {
+  return new Promise((resolve, reject) => {
+    const img = new Image();
+    img.onload = () => {
+      const sc = Math.min(1, maxSide / Math.max(img.width, img.height));
+      const c = document.createElement("canvas");
+      c.width = Math.round(img.width * sc); c.height = Math.round(img.height * sc);
+      c.getContext("2d").drawImage(img, 0, 0, c.width, c.height);
+      URL.revokeObjectURL(img.src);
+      resolve(c.toDataURL("image/jpeg", 0.92).split(",")[1]);
+    };
+    img.onerror = () => reject(new Error("이미지를 읽지 못했습니다."));
+    img.src = URL.createObjectURL(file);
+  });
+}
+
+const SCHEMA = {
+  type: "object",
+  properties: {
+    title: { type: "string" },
+    cards: {
+      type: "array",
+      items: {
+        type: "object",
+        properties: { w: {type:"string"}, m: {type:"string"}, p: {type:"string"}, e: {type:"string"}, h: {type:"string"} },
+        required: ["w","m","p","e","h"], additionalProperties: false
+      }
+    }
+  },
+  required: ["title","cards"], additionalProperties: false
+};
+
+async function callClaude(b64) {
+  const key = S.settings.apiKey.trim();
+  if (!key) throw new Error("NOKEY");
+  const res = await fetch("https://api.anthropic.com/v1/messages", {
+    method: "POST",
+    headers: {
+      "content-type": "application/json",
+      "x-api-key": key,
+      "anthropic-version": "2023-06-01",
+      "anthropic-dangerous-direct-browser-access": "true",
+    },
+    body: JSON.stringify({
+      model: S.settings.model,
+      max_tokens: 16000,
+      output_config: { format: { type: "json_schema", schema: SCHEMA } },
+      messages: [{ role: "user", content: [
+        { type: "image", source: { type: "base64", media_type: "image/jpeg", data: b64 } },
+        { type: "text", text: SHOT_PROMPT },
+      ]}],
+    }),
+  });
+  if (!res.ok) {
+    let msg = "";
+    try { const j = await res.json(); msg = (j.error && j.error.message) || ""; } catch (e) {}
+    if (res.status === 401) throw new Error("KEYBAD");
+    if (res.status === 429) throw new Error("RATE");
+    if (res.status === 400 && /credit|balance/i.test(msg)) throw new Error("CREDIT");
+    throw new Error("서버 오류 " + res.status + (msg ? " · " + msg : ""));
+  }
+  const j = await res.json();
+  const txt = (j.content.find(b => b.type === "text") || {}).text || "";
+  const parsed = JSON.parse(txt);
+  return parsed;
+}
+
+/* ========== 화면 공통 ========== */
 const app = document.getElementById("app");
 const tabsEl = document.getElementById("tabs");
-let currentTab = "home";
+const camIn = document.getElementById("camIn");
+let tab = "home";
 const TABS = [
   { id: "home", ico: "🏠", lbl: "홈" },
+  { id: "library", ico: "📚", lbl: "보관함" },
   { id: "stats", ico: "📊", lbl: "통계" },
   { id: "settings", ico: "⚙️", lbl: "설정" },
 ];
-function renderTabs(visible = true) {
-  tabsEl.style.display = visible ? "" : "none";
-  tabsEl.innerHTML = TABS.map(t =>
-    `<button class="${t.id === currentTab ? "on" : ""}" onclick="go('${t.id}')"><span class="ico">${t.ico}</span>${t.lbl}</button>`
-  ).join("");
+function showTabs(v) {
+  tabsEl.style.display = v ? "" : "none";
+  tabsEl.innerHTML = TABS.map(t => `<button class="${t.id===tab?"on":""}" onclick="go('${t.id}')"><span class="ico">${t.ico}</span>${t.lbl}</button>`).join("");
 }
-function go(tab) {
-  currentTab = tab;
-  if (tab === "home") renderHome();
-  else if (tab === "stats") renderStats();
-  else if (tab === "settings") renderSettings();
+function go(t) {
+  tab = t;
+  if (t === "home") renderHome();
+  else if (t === "library") renderLibrary();
+  else if (t === "stats") renderStats();
+  else if (t === "settings") renderSettings();
 }
-function esc(s) { return String(s).replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;"); }
-function shuffle(a) { a = [...a]; for (let i = a.length - 1; i > 0; i--) { const j = Math.floor(Math.random() * (i + 1)); [a[i], a[j]] = [a[j], a[i]]; } return a; }
+function esc(s) { return String(s == null ? "" : s).replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/"/g,"&quot;"); }
+function shuffle(a) { a = [...a]; for (let i=a.length-1;i>0;i--) { const j=Math.floor(Math.random()*(i+1)); [a[i],a[j]]=[a[j],a[i]]; } return a; }
+function boldWord(sent, w) {
+  const base = w.split("/")[0].trim().replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+  try { return esc(sent).replace(new RegExp("(" + base + "\\w*)", "i"), "<b>$1</b>"); } catch (e) { return esc(sent); }
+}
 
-/* ================= 홈 ================= */
+/* ========== 홈 ========== */
 function renderHome() {
-  renderTabs(true);
-  const due = dueCards().length;
-  const quota = newQuotaLeft();
-  const news = newCandidates(quota).length;
-
-  let setRows = "";
-  for (const sid of SET_ORDER) {
-    const s = DATA[sid]; if (!s) continue;
-    const total = s.cards.length;
-    const seen = ALL.filter(c => c.set === sid && S.cards[c.id]).length;
-    const pct = total ? Math.round(seen / total * 100) : 0;
-    setRows += `<div class="setrow"><span class="name">${esc(s.name)}</span><span class="bar"><i style="width:${pct}%"></i></span><span class="pct">${seen}/${total}</span></div>`;
+  showTabs(true);
+  const b = activeBatch();
+  const due = dueList().length;
+  let heroHtml;
+  if (b) {
+    const st = batchStats(b);
+    const pct = Math.round(st.mastered / st.total * 100);
+    heroHtml = `
+      <div class="hero">
+        <div class="label">지금 외우는 중</div>
+        <div class="title">${esc(b.name)}</div>
+        <div class="count"><b>${st.mastered}</b><span class="muted">/ ${st.total}개 완료</span></div>
+        <div class="bar"><i style="width:${pct}%"></i></div>
+        <div class="actions"><button class="btn primary" onclick="startLearn()">이어서 외우기</button></div>
+      </div>`;
+  } else {
+    heroHtml = `
+      <div class="hero" style="text-align:center">
+        <div style="font-size:42px">📷</div>
+        <div class="title" style="margin-top:6px">외울 단어를 찍어보세요</div>
+        <p class="muted">단어장이나 시험지를 촬영하면 뜻·예문·어원까지 자동으로 만들어집니다.</p>
+        <div class="actions"><button class="btn primary" onclick="startShot()">사진 찍기</button></div>
+      </div>`;
   }
-  if (!ALL.length) setRows = `<p class="muted">단어 데이터 파일(data/*.js)이 아직 없습니다.</p>`;
-
   app.innerHTML = `
-    <header class="top"><h1>에린데일 단어 암기</h1><span class="streak">🔥 ${S.streak}일 연속</span></header>
-    <div class="big-btns">
-      <button class="big-btn learn" onclick="startLearn()" ${news === 0 ? "disabled" : ""}>
-        <span class="num">${news}</span><span class="lbl">오늘의 새 단어</span>
+    <header class="top"><h1>단어 암기</h1><span class="streak">🔥 ${S.streak}일 연속</span></header>
+    ${heroHtml}
+    <div class="row2">
+      <button class="tile rev" onclick="startReview()" ${due===0?"disabled":""}>
+        <span class="num">${due}</span><span class="lbl">오늘 복습할 단어</span>
       </button>
-      <button class="big-btn review" onclick="startReview()" ${due === 0 ? "disabled" : ""}>
-        <span class="num">${due}</span><span class="lbl">복습할 단어</span>
+      <button class="tile shot" onclick="startShot()">
+        <span class="num">＋</span><span class="lbl">${b ? "새 사진 찍기" : "사진으로 추가"}</span>
       </button>
     </div>
-    <div class="card" style="margin-top:14px">
-      <h2>세트별 진행률</h2>
-      <div class="setlist">${setRows}</div>
-    </div>
-    <p class="muted" style="text-align:center">망각곡선에 맞춰 1일 → 3일 → 7일 → 30일 간격으로 자동 복습됩니다.</p>
-  `;
+    <p class="muted" style="text-align:center;margin-top:14px">완료한 묶음은 1일 → 3일 → 7일 → 30일 간격으로 다시 나옵니다.</p>`;
 }
 
-/* ================= 학습 세션 (신규 단어 5단계) ================= */
-let L = null; // {queue, i, step, said, quizChoices}
+/* ========== 촬영 → 인식 → 확인 ========== */
+function startShot() {
+  if (!S.settings.apiKey.trim()) { go("settings"); setTimeout(() => alert("먼저 설정에서 Claude API 키를 입력해 주세요."), 100); return; }
+  camIn.value = "";
+  camIn.click();
+}
+camIn.onchange = async () => {
+  const f = camIn.files && camIn.files[0];
+  if (!f) return;
+  showTabs(false);
+  app.innerHTML = `<div class="loading"><div class="spinner"></div>
+    <h2 style="font-size:17px">단어를 읽는 중…</h2>
+    <p class="muted">사진 속 단어를 찾아 뜻·예문·어원을 만들고 있습니다.<br>보통 20~60초 걸립니다.</p></div>`;
+  try {
+    const maxSide = S.settings.model.indexOf("haiku") >= 0 ? 1560 : 2000;
+    const b64 = await resizeToB64(f, maxSide);
+    const out = await callClaude(b64);
+    let cards = (out.cards || []).filter(c => c.w && /[a-zA-Z]/.test(c.w));
+    const seen = new Set();
+    cards = cards.filter(c => { const k = c.w.toLowerCase().trim(); if (seen.has(k)) return false; seen.add(k); return true; });
+    if (!cards.length) throw new Error("사진에서 영어 단어를 찾지 못했습니다. 글자가 선명하게 나오도록 다시 찍어 주세요.");
+    renderConfirm(out.title || "새 단어 묶음", cards);
+  } catch (e) {
+    let msg = e.message;
+    if (msg === "NOKEY") msg = "설정에서 API 키를 먼저 입력해 주세요.";
+    else if (msg === "KEYBAD") msg = "API 키가 올바르지 않습니다. 설정에서 다시 확인해 주세요.";
+    else if (msg === "RATE") msg = "요청이 너무 잦습니다. 잠시 후 다시 시도해 주세요.";
+    else if (msg === "CREDIT") msg = "API 크레딧이 부족합니다. Anthropic 콘솔에서 충전해 주세요.";
+    else if (/Failed to fetch|NetworkError/i.test(msg)) msg = "인터넷 연결을 확인해 주세요.";
+    app.innerHTML = `<div class="summary card"><div class="emoji">😕</div><h2>인식하지 못했습니다</h2>
+      <p>${esc(msg)}</p>
+      <div class="actions"><button class="btn primary" onclick="startShot()">다시 찍기</button>
+      <button class="btn ghost" onclick="go('home')">홈으로</button></div></div>`;
+  }
+};
+
+let CONF = null;
+function renderConfirm(title, cards) {
+  CONF = { title, cards };
+  showTabs(false);
+  renderConfirmBody();
+}
+function renderConfirmBody() {
+  const rows = CONF.cards.map((c, i) => `
+    <div class="edit-row">
+      <input class="w" value="${esc(c.w)}" oninput="CONF.cards[${i}].w=this.value">
+      <input class="m" value="${esc(c.m)}" placeholder="뜻" oninput="CONF.cards[${i}].m=this.value">
+      <button class="del" onclick="delRow(${i})">✕</button>
+    </div>`).join("");
+  app.innerHTML = `
+    <div class="session-head"><span>인식 결과 확인</span><button onclick="go('home')">취소</button></div>
+    <div class="ok-notice">단어 ${CONF.cards.length}개를 찾았습니다. 틀린 곳만 눌러서 고친 뒤 시작하세요.</div>
+    <div class="card">
+      <input type="text" value="${esc(CONF.title)}" style="width:100%;font-weight:700;margin-bottom:6px" oninput="CONF.title=this.value">
+      ${rows}
+    </div>
+    <div class="actions">
+      <button class="btn primary" onclick="saveBatch()">이 단어들 외우기 시작</button>
+      <button class="btn ghost" onclick="startShot()">다시 찍기</button>
+    </div>`;
+}
+function delRow(i) { CONF.cards.splice(i, 1); renderConfirmBody(); }
+function saveBatch() {
+  const cards = CONF.cards.filter(c => c.w.trim());
+  if (!cards.length) { alert("단어가 없습니다."); return; }
+  const id = "b" + Date.now();
+  const b = { id, name: CONF.title.trim() || "새 단어 묶음", created: today(), cards: cards.map(c => ({
+    w: c.w.trim(), m: (c.m || "").trim(), p: c.p || "", e: c.e || "", h: c.h || ""
+  })), done: false };
+  S.batches[id] = b;
+  b.cards.forEach(c => { if (c.m) S.userDict[c.w.toLowerCase()] = { m: c.m, p: c.p, e: c.e, h: c.h }; });
+  S.active = id;
+  CONF = null; save();
+  enrichBatch(b);
+  go("home");
+  setTimeout(() => startLearn(), 60);
+}
+
+/* ========== 학습 세션 (활성 묶음) ========== */
+let L = null;
 function startLearn() {
-  const quota = newQuotaLeft();
-  const queue = newCandidates(quota);
-  if (!queue.length) return;
-  L = { queue, i: 0, step: 1, said: 0, wrong: [] };
+  const b = activeBatch(); if (!b) { go("home"); return; }
+  const st = batchStats(b);
+  if (st.left === 0) { renderBatchDone(b); return; }
+  let quota = newLeft();
+  const q = [];
+  b.cards.forEach((c, i) => {
+    const p = P(b.id, i);
+    if (p.mastered) return;
+    if (p.seen) q.push(i);
+    else if (quota > 0) { q.push(i); quota--; }
+  });
+  if (!q.length) {
+    app.innerHTML = `<div class="summary card"><div class="emoji">☀️</div><h2>오늘 몫을 다 했어요</h2>
+      <p>새 단어는 하루 ${S.settings.newPerDay}개까지만 소개합니다.<br>내일 이어서 하면 훨씬 오래 기억에 남습니다.</p>
+      <div class="actions"><button class="btn ghost" onclick="bumpQuota()">그래도 더 할래요</button>
+      <button class="btn primary" onclick="go('home')">홈으로</button></div></div>`;
+    showTabs(false); return;
+  }
+  L = { b, queue: shuffle(q), step: 1, said: 0, doneCount: 0, startLeft: st.left };
   renderLearn();
 }
-function renderLearn() {
-  renderTabs(false);
-  const c = L.queue[L.i];
-  const pct = Math.round((L.i / L.queue.length) * 100);
-  const head = `
-    <div class="session-head"><span>새 단어 ${L.i + 1} / ${L.queue.length}</span><button onclick="endSession()">그만하기</button></div>
-    <div class="progress"><i style="width:${pct}%"></i></div>`;
-  const exHtml = c.e ? `<p class="example">${esc(c.e).replace(new RegExp("(" + c.w.split("/")[0].replace(/[.*+?^${}()|[\]\\]/g, "\\$&") + "\\w*)", "i"), "<b>$1</b>")}</p>` : "";
+function bumpQuota() { S.newCount = Math.max(0, S.newCount - 10); save(); startLearn(); }
 
-  if (L.step === 1) {
-    // 1단계: 문맥 속 첫 만남 — 뜻 가리고 추측
-    app.innerHTML = head + `
-      <div class="word-card">
-        <span class="step-tag">1단계 · 문맥에서 만나기</span>
-        <div class="word">${esc(c.w)}</div>
-        <div class="pos">${esc(c.p || "")}</div>
-        ${exHtml}
-        <button class="speak-btn" onclick="speak('${esc(c.w)}')">🔊</button>
-        <p class="muted" style="margin-top:12px">예문을 보고 뜻을 먼저 추측해 보세요.</p>
-      </div>
-      <div class="actions"><button class="btn primary" onclick="L.step=2;renderLearn()">뜻 확인하기</button></div>`;
-    speak(c.w);
-  } else if (L.step === 2) {
-    // 2단계: 정교화 — 뜻 + 어원/연상
-    app.innerHTML = head + `
-      <div class="word-card">
-        <span class="step-tag">2단계 · 뜻과 연결고리</span>
-        <div class="word">${esc(c.w)}</div>
-        <div class="pos">${esc(c.p || "")}</div>
-        <div class="meaning">${esc(c.m)}</div>
-        ${exHtml}
-        ${c.h ? `<div class="hint">💡 ${esc(c.h)}</div>` : ""}
-      </div>
-      <div class="actions"><button class="btn primary" onclick="L.step=3;L.said=0;renderLearn()">발음 연습하기</button></div>`;
-  } else if (L.step === 3) {
-    // 3단계: 다중 감각 — 듣고 5번 따라 말하기
-    const dots = Array.from({length:5}, (_, i) => `<div class="say-dot ${i < L.said ? "done" : ""}">${i < L.said ? "✓" : i + 1}</div>`).join("");
-    app.innerHTML = head + `
-      <div class="word-card">
-        <span class="step-tag">3단계 · 입으로 각인</span>
-        <div class="word">${esc(c.w)}</div>
+function renderLearn() {
+  if (!L || !L.queue.length) { return renderLearnSummary(); }
+  showTabs(false);
+  const b = L.b, i = L.queue[0], c = b.cards[i], p = P(b.id, i);
+  const st = batchStats(b);
+  const pct = Math.round(st.mastered / st.total * 100);
+  const head = `<div class="session-head"><span>${esc(b.name)} · ${st.mastered}/${st.total} 완료</span><button onclick="endSession()">그만하기</button></div>
+    <div class="progress"><i style="width:${pct}%"></i></div>`;
+  const ex = c.e ? `<p class="example">${boldWord(c.e, c.w)}</p>` : "";
+  const ipa = c.ipa ? `<div class="ipa">${esc(c.ipa)}</div>` : "";
+  const stars = `<div class="mstars">${"★".repeat(p.streak)}${"☆".repeat(Math.max(0, S.settings.mastery - p.streak))}</div>`;
+
+  if (!p.seen) {
+    if (L.step === 1) {
+      app.innerHTML = head + `<div class="word-card"><span class="step-tag">1단계 · 문맥에서 만나기</span>
+        <div class="word">${esc(c.w)}</div>${ipa}<div class="pos">${esc(c.p)}</div>${ex}
+        <button class="speak-btn" onclick="say()">🔊</button>
+        <p class="muted" style="margin-top:11px">예문을 보고 뜻을 먼저 추측해 보세요.</p></div>
+        <div class="actions"><button class="btn primary" onclick="L.step=2;renderLearn()">뜻 확인하기</button></div>`;
+      say();
+    } else if (L.step === 2) {
+      app.innerHTML = head + `<div class="word-card"><span class="step-tag">2단계 · 뜻과 연결고리</span>
+        <div class="word">${esc(c.w)}</div>${ipa}<div class="pos">${esc(c.p)}</div>
+        <div class="meaning">${esc(c.m)}</div>${ex}
+        ${c.h ? `<div class="hint">💡 ${esc(c.h)}</div>` : ""}</div>
+        <div class="actions"><button class="btn primary" onclick="L.step=3;L.said=0;renderLearn()">발음 연습하기</button></div>`;
+    } else if (L.step === 3) {
+      const dots = Array.from({length:5}, (_, k) => `<div class="say-dot ${k<L.said?"done":""}">${k<L.said?"✓":k+1}</div>`).join("");
+      app.innerHTML = head + `<div class="word-card"><span class="step-tag">3단계 · 입으로 각인</span>
+        <div class="word">${esc(c.w)}</div>${ipa}
         <div class="meaning" style="font-size:17px">${esc(c.m)}</div>
-        <button class="speak-btn" onclick="speak('${esc(c.w)}')">🔊</button>
-        <p class="muted" style="margin-top:12px">발음을 듣고 소리 내어 따라 한 뒤, 버튼을 눌러 체크하세요.</p>
-        <div class="say-counter">${dots}</div>
-      </div>
-      <div class="actions">
-        <button class="btn ghost" onclick="saidOnce()">따라 말했어요 (${L.said}/5)</button>
-        ${L.said >= 5 ? `<button class="btn primary" onclick="toQuiz()">인출 퀴즈로</button>` : ""}
-      </div>`;
-  } else if (L.step === 4) {
-    renderQuiz(c, head, "4단계 · 스스로 꺼내보기", (correct) => {
-      if (!correct) L.wrong.push(c);
-      S.doneNewToday++;
-      gradeCard(c.id, correct);
-      touchStreak();
-      L.i++;
-      if (L.i < L.queue.length) { L.step = 1; L.said = 0; renderLearn(); }
-      else renderLearnSummary();
-    });
+        <button class="speak-btn" onclick="say()">🔊</button>
+        <p class="muted" style="margin-top:11px">듣고 소리 내어 따라 한 뒤 버튼을 누르세요.</p>
+        <div class="say-counter">${dots}</div></div>
+        <div class="actions"><button class="btn ghost" onclick="saidOnce()">따라 말했어요 (${L.said}/5)</button>
+        ${L.said>=5?`<button class="btn primary" onclick="L.step=4;renderLearn()">퀴즈로</button>`:""}</div>`;
+    } else {
+      quizScreen(c, head, "4단계 · 스스로 꺼내보기", false, (ok) => afterAnswer(ok));
+    }
+  } else {
+    quizScreen(c, head, "다시 확인하기", true, (ok) => afterAnswer(ok), stars);
   }
 }
-function saidOnce() { speak(L.queue[L.i].w); L.said = Math.min(5, L.said + 1); renderLearn(); }
-function toQuiz() { L.step = 4; renderLearn(); }
+function say() { const c = L.b.cards[L.queue[0]]; speak(c.w, c.audio); }
+function saidOnce() { say(); L.said = Math.min(5, L.said + 1); renderLearn(); }
+
+function afterAnswer(ok) {
+  const b = L.b, i = L.queue.shift(), p = P(b.id, i);
+  p.seen = true;
+  if (!p.reps) { S.newCount++; }
+  p.reps++;
+  if (ok) {
+    p.streak++;
+    if (p.streak >= S.settings.mastery) { p.mastered = true; p.iv = 1; p.due = addDays(1); L.doneCount++; }
+    else L.queue.splice(Math.min(L.queue.length, 3), 0, i);
+  } else {
+    p.streak = 0; p.lapses++;
+    L.queue.splice(Math.min(L.queue.length, 2), 0, i);
+  }
+  touchStreak(); save();
+  L.step = 1; L.said = 0;
+  if (batchStats(b).left === 0) return renderBatchDone(b);
+  renderLearn();
+}
 function renderLearnSummary() {
-  renderTabs(true); currentTab = "home"; renderTabs(true);
-  const total = L.queue.length, wrong = L.wrong.length;
-  app.innerHTML = `
-    <div class="summary card">
-      <div class="emoji">${wrong === 0 ? "🎉" : "💪"}</div>
-      <h2>새 단어 ${total}개 학습 완료!</h2>
-      <p>바로 맞힌 단어 ${total - wrong}개 · 다시 볼 단어 ${wrong}개</p>
-      <p style="margin-top:8px">틀린 단어는 내일, 맞힌 단어는 간격에 맞춰 다시 나옵니다.<br>잠들기 전에 오늘 복습을 한 번 더 하면 기억이 굳어져요. 🌙</p>
-      <div class="actions"><button class="btn primary" onclick="go('home')">홈으로</button></div>
-    </div>`;
-  L = null;
+  const b = L ? L.b : null; L = null;
+  showTabs(true); tab = "home"; showTabs(true);
+  if (!b) return go("home");
+  const st = batchStats(b);
+  app.innerHTML = `<div class="summary card"><div class="emoji">👏</div>
+    <h2>오늘 학습 완료!</h2>
+    <p>${esc(b.name)} · ${st.mastered} / ${st.total}개 외웠습니다</p>
+    <p style="margin-top:8px">자기 전에 복습을 한 번 더 하면<br>기억이 훨씬 단단해집니다. 🌙</p>
+    <div class="actions"><button class="btn primary" onclick="go('home')">홈으로</button></div></div>`;
+}
+function renderBatchDone(b) {
+  finishBatch(b); L = null;
+  showTabs(true); tab = "home"; showTabs(true);
+  app.innerHTML = `<div class="summary card"><div class="emoji">🎉</div>
+    <h2>${esc(b.name)} 전부 외웠어요!</h2>
+    <p>${b.cards.length}개 단어를 모두 통과했습니다.</p>
+    <p style="margin-top:8px">이제 이 단어들은 복습 목록으로 넘어가<br>1일 → 3일 → 7일 → 30일 간격으로 다시 나옵니다.</p>
+    <div class="actions">
+      <button class="btn primary" onclick="startShot()">📷 새 사진 찍기</button>
+      <button class="btn ghost" onclick="resetBatch('${b.id}')">이 묶음 처음부터 다시</button>
+      <button class="btn ghost" onclick="go('home')">홈으로</button>
+    </div></div>`;
+}
+function resetBatch(id) {
+  const b = S.batches[id]; if (!b) return;
+  if (!confirm(`"${b.name}"을(를) 처음부터 다시 외울까요?`)) return;
+  b.cards.forEach((c, i) => { delete S.prog[id + "#" + i]; });
+  b.done = false; S.active = id; save(); go("home"); setTimeout(startLearn, 60);
 }
 
-/* ================= 복습 세션 ================= */
+/* ========== 복습 ========== */
 let R = null;
 function startReview() {
-  const queue = shuffle(dueCards());
-  if (!queue.length) return;
-  R = { queue, i: 0, revealed: false, wrong: 0 };
+  const list = shuffle(dueList());
+  if (!list.length) return;
+  R = { list, i: 0, wrong: 0 };
   renderReview();
 }
 function renderReview() {
-  renderTabs(false);
-  const c = R.queue[R.i];
-  const pct = Math.round((R.i / R.queue.length) * 100);
-  const head = `
-    <div class="session-head"><span>복습 ${R.i + 1} / ${R.queue.length}</span><button onclick="endSession()">그만하기</button></div>
+  showTabs(false);
+  const it = R.list[R.i];
+  const pct = Math.round(R.i / R.list.length * 100);
+  const head = `<div class="session-head"><span>복습 ${R.i+1} / ${R.list.length}</span><button onclick="endSession()">그만하기</button></div>
     <div class="progress"><i style="width:${pct}%"></i></div>`;
-  renderQuiz(c, head, "복습 · 뜻 떠올리기", (correct) => {
-    if (!correct) R.wrong++;
-    gradeCard(c.id, correct);
+  quizScreen(it.c, head, "복습 · 뜻 떠올리기", true, (ok) => {
+    if (!ok) R.wrong++;
+    gradeReview(it.b.id, it.i, ok);
     touchStreak();
     R.i++;
-    if (R.i < R.queue.length) renderReview();
+    if (R.i < R.list.length) renderReview();
     else {
-      const total = R.queue.length, wrong = R.wrong;
-      renderTabs(true); currentTab = "home";  renderTabs(true);
-      app.innerHTML = `
-        <div class="summary card">
-          <div class="emoji">${wrong === 0 ? "🧠" : "📚"}</div>
-          <h2>복습 ${total}개 완료!</h2>
-          <p>정답 ${total - wrong}개 · 오답 ${wrong}개</p>
-          <p style="margin-top:8px">맞힌 단어는 복습 간격이 길어지고,<br>틀린 단어는 내일 다시 나옵니다.</p>
-          <div class="actions"><button class="btn primary" onclick="go('home')">홈으로</button></div>
-        </div>`;
-      R = null;
+      const t = R.list.length, w = R.wrong; R = null;
+      showTabs(true); tab = "home"; showTabs(true);
+      app.innerHTML = `<div class="summary card"><div class="emoji">${w===0?"🧠":"📚"}</div>
+        <h2>복습 ${t}개 완료!</h2><p>정답 ${t-w}개 · 오답 ${w}개</p>
+        <p style="margin-top:8px">맞힌 단어는 간격이 길어지고,<br>틀린 단어는 내일 다시 나옵니다.</p>
+        <div class="actions"><button class="btn primary" onclick="go('home')">홈으로</button></div></div>`;
     }
-  }, true);
+  });
 }
 
-/* ================= 4지선다 퀴즈 공통 ================= */
-function buildChoices(card) {
-  const pool = ALL.filter(x => x.id !== card.id && x.m !== card.m && (x.p === card.p || Math.random() < 0.3));
+/* ========== 퀴즈 공통 ========== */
+function poolCards() {
+  const out = [];
+  for (const b of Object.values(S.batches)) for (const c of b.cards) out.push(c);
+  if (out.length < 8) for (const sid of BUILTIN_ORDER) { const s = BUILTIN[sid]; if (s) out.push(...s.cards); }
+  return out;
+}
+function quizScreen(card, headHtml, tagText, blue, onDone, extraHtml) {
+  const pool = poolCards().filter(x => x.m && x.m !== card.m);
   const wrongs = shuffle(pool).slice(0, 3).map(x => x.m);
-  while (wrongs.length < 3) wrongs.push("(보기 부족)");
-  return shuffle([card.m, ...wrongs]);
-}
-let QUIZ_DONE = false;
-function renderQuiz(card, headHtml, tag, onDone, withSpeak) {
-  QUIZ_DONE = false;
-  const choices = buildChoices(card);
-  window.__quizPick = (btn, m) => {
-    if (QUIZ_DONE) return;
-    QUIZ_DONE = true;
-    const correct = m === card.m;
-    document.querySelectorAll(".choice").forEach(b => {
-      b.disabled = true;
-      if (b.dataset.m === card.m) b.classList.add("right");
-      else if (b === btn && !correct) b.classList.add("wrong");
+  while (wrongs.length < 3) wrongs.push("(보기 없음)");
+  const choices = shuffle([card.m, ...wrongs]);
+  let answered = false;
+  window.__pick = (btn, m) => {
+    if (answered) return; answered = true;
+    const ok = m === card.m;
+    document.querySelectorAll(".choice").forEach(x => {
+      x.disabled = true;
+      if (x.dataset.m === card.m) x.classList.add("right");
+      else if (x === btn && !ok) x.classList.add("wrong");
     });
-    const fb = document.getElementById("quiz-fb");
-    fb.innerHTML = correct
-      ? `<button class="btn primary" onclick="__quizNext(true)">맞았어요! 다음 →</button>`
-      : `<div class="hint" style="display:block;text-align:left;margin-top:4px">💡 ${esc(card.h || "")}<br><b>${esc(card.w)}</b> = ${esc(card.m)}${card.e ? "<br>" + esc(card.e) : ""}</div>
-         <button class="btn warn" onclick="__quizNext(false)">다시 볼게요, 다음 →</button>`;
-    if (!correct) speak(card.w);
+    document.getElementById("fb").innerHTML = ok
+      ? `<button class="btn primary" onclick="__next(true)">잘했어요! 다음 →</button>`
+      : `<div class="hint" style="display:block">💡 ${esc(card.h||"")}${card.h?"<br>":""}<b>${esc(card.w)}</b> = ${esc(card.m)}${card.e?"<br>"+esc(card.e):""}</div>
+         <button class="btn warn" onclick="__next(false)">다시 볼게요, 다음 →</button>`;
+    if (!ok) speak(card.w, card.audio);
   };
-  window.__quizNext = (correct) => onDone(correct);
+  window.__next = (ok) => onDone(ok);
+  const ipa = card.ipa ? `<div class="ipa">${esc(card.ipa)}</div>` : "";
   app.innerHTML = headHtml + `
-    <div class="word-card">
-      <span class="step-tag">${esc(tag)}</span>
-      <div class="word">${esc(card.w)}</div>
-      <div class="pos">${esc(card.p || "")}</div>
-      ${withSpeak ? `<button class="speak-btn" onclick="speak('${esc(card.w)}')">🔊</button>` : ""}
-      <p class="muted" style="margin-top:10px">뜻을 먼저 머릿속으로 떠올린 뒤 고르세요.</p>
-    </div>
-    <div class="choices">
-      ${choices.map(m => `<button class="choice" data-m="${esc(m)}" onclick="__quizPick(this, this.dataset.m)">${esc(m)}</button>`).join("")}
-    </div>
-    <div class="actions" id="quiz-fb"></div>`;
-  if (withSpeak) speak(card.w);
+    <div class="word-card"><span class="step-tag ${blue?"b":""}">${esc(tagText)}</span>
+      <div class="word">${esc(card.w)}</div>${ipa}<div class="pos">${esc(card.p)}</div>
+      <button class="speak-btn" onclick="speak('${esc(card.w).replace(/'/g,"\\'")}', ${card.audio?`'${esc(card.audio)}'`:"null"})">🔊</button>
+      ${extraHtml || ""}
+      <p class="muted" style="margin-top:9px">뜻을 먼저 떠올린 뒤 고르세요.</p></div>
+    <div class="choices">${choices.map(m => `<button class="choice" data-m="${esc(m)}" onclick="__pick(this,this.dataset.m)">${esc(m)}</button>`).join("")}</div>
+    <div class="actions" id="fb"></div>`;
+  if (blue) speak(card.w, card.audio);
 }
-
 function endSession() { L = null; R = null; go("home"); }
 
-/* ================= 통계 ================= */
+/* ========== 보관함 ========== */
+function renderLibrary() {
+  showTabs(true);
+  const all = Object.values(S.batches).sort((a,b) => (b.created||"").localeCompare(a.created||""));
+  const mine = all.map(b => {
+    const st = batchStats(b);
+    const isActive = S.active === b.id;
+    const label = isActive ? "이어서" : (b.done ? "다시" : "시작");
+    return `<div class="listrow"><div class="info">
+        <div class="nm">${esc(b.name)}${isActive?" · 진행 중":""}</div>
+        <div class="sub">${st.mastered}/${st.total} 완료 · ${esc(b.created)}${b.done?" · 복습 중":""}</div>
+      </div>
+      <button class="go ${b.done?"gray":""}" onclick="openBatch('${b.id}')">${label}</button>
+      <button class="del" onclick="delBatch('${b.id}')">✕</button></div>`;
+  }).join("") || `<p class="muted">아직 만든 묶음이 없습니다. 홈에서 사진을 찍어보세요.</p>`;
+
+  const builtin = BUILTIN_ORDER.filter(s => BUILTIN[s]).map(sid => {
+    const s = BUILTIN[sid];
+    const exists = Object.values(S.batches).find(b => b.src === sid);
+    const st = exists ? batchStats(exists) : null;
+    return `<div class="listrow"><div class="info">
+        <div class="nm">${esc(s.name)}</div>
+        <div class="sub">${st ? st.mastered+"/"+st.total+" 완료" : s.cards.length + "개 단어"}</div>
+      </div>
+      <button class="go ${st?"gray":""}" onclick="useBuiltin('${sid}')">${st ? "이어서" : "시작"}</button></div>`;
+  }).join("");
+
+  app.innerHTML = `
+    <header class="top"><h1>보관함</h1></header>
+    <div class="card"><h2>내가 찍은 묶음</h2>${mine}</div>
+    <div class="card"><h2>에린데일 기본 단어장</h2>${builtin}</div>`;
+}
+function openBatch(id) {
+  const b = S.batches[id]; if (!b) return;
+  if (b.done) { if (!confirm(`"${b.name}"을(를) 다시 외울까요? 진행 기록이 초기화됩니다.`)) return; return resetBatch(id); }
+  S.active = id; save(); go("home"); setTimeout(startLearn, 60);
+}
+function delBatch(id) {
+  const b = S.batches[id]; if (!b) return;
+  if (!confirm(`"${b.name}"을(를) 삭제할까요? 학습 기록도 함께 사라집니다.`)) return;
+  b.cards.forEach((c, i) => delete S.prog[id + "#" + i]);
+  delete S.batches[id];
+  if (S.active === id) S.active = null;
+  save(); renderLibrary();
+}
+function useBuiltin(sid) {
+  let b = Object.values(S.batches).find(x => x.src === sid);
+  if (!b) {
+    const s = BUILTIN[sid];
+    const id = "b" + Date.now();
+    b = { id, src: sid, name: s.name, created: today(), cards: s.cards.map(c => ({...c})), done: false };
+    S.batches[id] = b;
+    enrichBatch(b);
+  }
+  if (b.done) { if (!confirm(`"${b.name}"을(를) 다시 외울까요?`)) return; return resetBatch(b.id); }
+  S.active = b.id; save(); go("home"); setTimeout(startLearn, 60);
+}
+
+/* ========== 통계 ========== */
 function renderStats() {
-  renderTabs(true);
-  const seen = Object.keys(S.cards).length;
-  const due = dueCards().length;
-  const lt = longTermCount();
-  const lapses = Object.values(S.cards).reduce((a, c) => a + (c.lapses || 0), 0);
+  showTabs(true);
+  let total = 0, mastered = 0, lt = 0, lapses = 0;
+  for (const b of Object.values(S.batches)) {
+    total += b.cards.length;
+    b.cards.forEach((c, i) => { const p = S.prog[b.id+"#"+i]; if (!p) return;
+      if (p.mastered) mastered++; if (p.iv >= 30) lt++; lapses += p.lapses || 0; });
+  }
+  const due = dueList().length;
+  const stages = { "1일": 0, "3일": 0, "7일": 0, "30일+": 0 };
+  Object.values(S.prog).forEach(p => { if (!p.mastered) return;
+    if (p.iv >= 30) stages["30일+"]++; else if (p.iv >= 7) stages["7일"]++; else if (p.iv >= 3) stages["3일"]++; else stages["1일"]++; });
+  const max = Math.max(1, ...Object.values(stages));
+  const bars = Object.entries(stages).map(([k,v]) =>
+    `<div class="listrow" style="border:none;padding:5px 0"><span style="flex:0 0 74px;font-size:14px">${k} 간격</span>
+     <span class="bar" style="flex:1"><i style="width:${Math.round(v/max*100)}%"></i></span>
+     <span class="muted" style="flex:0 0 34px;text-align:right">${v}</span></div>`).join("");
   app.innerHTML = `
     <header class="top"><h1>학습 통계</h1><span class="streak">🔥 ${S.streak}일 연속</span></header>
     <div class="stat-grid">
-      <div class="stat"><div class="v">${seen}</div><div class="k">학습 시작한 단어 (전체 ${ALL.length})</div></div>
-      <div class="stat"><div class="v">${lt}</div><div class="k">장기기억 단계 (30일 간격 도달)</div></div>
+      <div class="stat"><div class="v">${mastered}</div><div class="k">외운 단어 (전체 ${total})</div></div>
+      <div class="stat"><div class="v">${lt}</div><div class="k">장기기억 단계 (30일 도달)</div></div>
       <div class="stat"><div class="v">${due}</div><div class="k">오늘 복습 대기</div></div>
       <div class="stat"><div class="v">${lapses}</div><div class="k">누적 오답 횟수</div></div>
     </div>
-    <div class="card" style="margin-top:14px">
-      <h2>기억 단계 분포</h2>
-      ${stageBar()}
-      <p class="muted" style="margin-top:10px">단어가 1일 → 3일 → 7일 → 30일 간격을 통과할수록 해마의 단기기억에서 대뇌피질의 장기기억으로 옮겨간 것입니다.</p>
-    </div>`;
-}
-function stageBar() {
-  const stages = { "1일": 0, "3일": 0, "7일": 0, "30일+": 0 };
-  Object.values(S.cards).forEach(c => {
-    if (c.iv >= 30) stages["30일+"]++;
-    else if (c.iv >= 7) stages["7일"]++;
-    else if (c.iv >= 3) stages["3일"]++;
-    else stages["1일"]++;
-  });
-  const max = Math.max(1, ...Object.values(stages));
-  return Object.entries(stages).map(([k, v]) =>
-    `<div class="setrow"><span class="name">${k} 간격</span><span class="bar"><i style="width:${Math.round(v / max * 100)}%"></i></span><span class="pct">${v}</span></div>`
-  ).join("");
+    <div class="card" style="margin-top:14px"><h2>기억 단계 분포</h2>${bars}
+      <p class="muted" style="margin-top:8px">30일 간격까지 통과한 단어는 해마의 단기기억에서 대뇌피질의 장기기억으로 옮겨간 것입니다.</p></div>`;
 }
 
-/* ================= 설정 ================= */
+/* ========== 설정 ========== */
 function renderSettings() {
-  renderTabs(true);
-  const setChecks = SET_ORDER.filter(sid => DATA[sid]).map(sid => `
-    <label class="chkline"><input type="checkbox" ${S.settings.activeSets.includes(sid) ? "checked" : ""} onchange="toggleSet('${sid}', this.checked)"> ${esc(DATA[sid].name)}</label>
-  `).join("");
+  showTabs(true);
+  const k = S.settings.apiKey;
+  const masked = k ? k.slice(0, 7) + "•".repeat(10) + k.slice(-4) : "";
   app.innerHTML = `
     <header class="top"><h1>설정</h1></header>
     <div class="card">
-      <h2>학습량</h2>
-      <div class="setting-row">
-        <span>하루 새 단어 개수 <span class="muted">(10~20 권장)</span></span>
-        <select onchange="S.settings.newPerDay=+this.value;save()">
-          ${[5,10,15,20,30].map(n => `<option value="${n}" ${S.settings.newPerDay === n ? "selected" : ""}>${n}개</option>`).join("")}
-        </select>
+      <h2>Claude API 키</h2>
+      ${k ? `<div class="ok-notice">키가 등록되어 있습니다 · ${esc(masked)}</div>`
+          : `<div class="notice">사진 촬영 기능을 쓰려면 키가 필요합니다.</div>`}
+      <input type="password" id="keyIn" placeholder="sk-ant-..." style="width:100%" value="">
+      <div class="actions" style="margin-top:10px">
+        <button class="btn primary" onclick="saveKey()">키 저장</button>
+        ${k ? `<button class="btn ghost" onclick="clearKey()">키 삭제</button>` : ""}
       </div>
-      <div class="setting-row">
-        <span>발음 속도</span>
-        <select onchange="S.settings.ttsRate=+this.value;save()">
-          ${[[0.7,"느리게"],[0.9,"보통"],[1.1,"빠르게"]].map(([v,l]) => `<option value="${v}" ${S.settings.ttsRate === v ? "selected" : ""}>${l}</option>`).join("")}
-        </select>
-      </div>
+      <p class="muted" style="margin-top:10px">키는 이 기기 안에만 저장되며 어디에도 전송되지 않습니다.
+      <a href="https://console.anthropic.com/settings/keys" target="_blank" style="color:var(--accent)">키 발급받기 →</a></p>
     </div>
     <div class="card">
-      <h2>학습할 세트</h2>
-      ${setChecks || '<p class="muted">데이터 없음</p>'}
+      <h2>인식 품질</h2>
+      <div class="setting-row"><span>사용 모델</span>
+        <select onchange="S.settings.model=this.value;save();renderSettings()">
+          <option value="claude-haiku-4-5" ${S.settings.model==="claude-haiku-4-5"?"selected":""}>기본 (장당 약 35원)</option>
+          <option value="claude-sonnet-5" ${S.settings.model==="claude-sonnet-5"?"selected":""}>정밀 (장당 약 90원)</option>
+        </select></div>
+      <p class="muted">글씨가 작거나 흐린 자료는 정밀을 쓰면 더 잘 읽습니다.</p>
+    </div>
+    <div class="card">
+      <h2>학습</h2>
+      <div class="setting-row"><span>하루 새 단어 <span class="muted">(10~20 권장)</span></span>
+        <select onchange="S.settings.newPerDay=+this.value;save()">
+          ${[5,10,15,20,30,50].map(n=>`<option value="${n}" ${S.settings.newPerDay===n?"selected":""}>${n}개</option>`).join("")}
+        </select></div>
+      <div class="setting-row"><span>몇 번 맞혀야 완료</span>
+        <select onchange="S.settings.mastery=+this.value;save()">
+          ${[2,3,4].map(n=>`<option value="${n}" ${S.settings.mastery===n?"selected":""}>연속 ${n}번</option>`).join("")}
+        </select></div>
+      <div class="setting-row"><span>발음 속도</span>
+        <select onchange="S.settings.ttsRate=+this.value;save()">
+          ${[[0.7,"느리게"],[0.9,"보통"],[1.1,"빠르게"]].map(([v,l])=>`<option value="${v}" ${S.settings.ttsRate===v?"selected":""}>${l}</option>`).join("")}
+        </select></div>
+      <div class="setting-row"><span>원어민 발음 사용 <span class="muted">(무료 사전)</span></span>
+        <input type="checkbox" ${S.settings.useDictApi?"checked":""} onchange="S.settings.useDictApi=this.checked;save()" style="width:20px;height:20px"></div>
     </div>
     <div class="card">
       <h2>데이터</h2>
-      <div class="setting-row"><span>학습 기록 내보내기</span><button class="btn ghost" style="padding:8px 14px;font-size:14px" onclick="exportData()">복사</button></div>
-      <div class="setting-row"><span class="muted">모든 학습 기록 삭제</span><button class="danger-link" onclick="resetAll()">초기화</button></div>
+      <div class="setting-row"><span>학습 기록 복사</span><button class="btn ghost" style="width:auto;padding:8px 14px;font-size:14px" onclick="exportData()">복사</button></div>
+      <div class="setting-row"><span class="muted">모든 기록 삭제</span><button class="danger-link" onclick="resetAll()">초기화</button></div>
     </div>`;
 }
-function toggleSet(sid, on) {
-  const a = new Set(S.settings.activeSets);
-  on ? a.add(sid) : a.delete(sid);
-  S.settings.activeSets = [...a]; save();
+function saveKey() {
+  const v = document.getElementById("keyIn").value.trim();
+  if (!v) { alert("키를 입력해 주세요."); return; }
+  S.settings.apiKey = v; save(); renderSettings();
+  alert("저장했습니다. 이제 홈에서 사진을 찍어보세요.");
 }
-function exportData() {
-  navigator.clipboard.writeText(localStorage.getItem(KEY) || "").then(() => alert("학습 기록이 클립보드에 복사되었습니다."));
-}
-function resetAll() {
-  if (confirm("정말 모든 학습 기록을 삭제할까요? 되돌릴 수 없습니다.")) {
-    localStorage.removeItem(KEY); S = load(); go("home");
-  }
-}
+function clearKey() { if (confirm("저장된 키를 삭제할까요?")) { S.settings.apiKey = ""; save(); renderSettings(); } }
+function exportData() { navigator.clipboard.writeText(localStorage.getItem(KEY) || "").then(() => alert("학습 기록을 클립보드에 복사했습니다.")).catch(() => alert("복사에 실패했습니다.")); }
+function resetAll() { if (confirm("모든 묶음과 학습 기록을 삭제할까요? 되돌릴 수 없습니다.")) { localStorage.removeItem(KEY); S = load(); go("home"); } }
 
 /* 시작 */
 go("home");
-
-/* PWA: 오프라인 지원 (https/localhost에서만 동작) */
 if ("serviceWorker" in navigator && (location.protocol === "https:" || location.hostname === "localhost")) {
   navigator.serviceWorker.register("sw.js").catch(() => {});
 }
