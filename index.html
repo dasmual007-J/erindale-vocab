@@ -137,7 +137,6 @@
 <body>
 <div id="app"></div>
 <nav class="tabs" id="tabs"></nav>
-<input type="file" id="camIn" accept="application/pdf,image/*" style="display:none">
 
 <script src="data/set_a.js"></script>
 <script src="data/set_a1.js"></script>
@@ -172,7 +171,7 @@ function load() {
 }
 function fresh() {
   return {
-    settings: { newPerDay: 10, ttsRate: 0.9, apiKey: "", model: "claude-haiku-4-5", mastery: 3, useDictApi: true },
+    settings: { newPerDay: 10, ttsRate: 0.9, mastery: 3, useDictApi: true },
     batches: {},        // id -> {id,name,created,cards:[{w,m,p,e,h,ipa,audio}],done,doneAt}
     active: null,       // 현재 학습 중 묶음 id
     prog: {},           // "batchId#idx" -> {seen,streak,mastered,iv,due,ef,reps,lapses}
@@ -284,96 +283,9 @@ async function enrichBatch(b) {
   save();
 }
 
-/* ========== Claude API: 사진 → 카드 ========== */
-const SHOT_PROMPT = `이 파일은 영어 단어 학습 자료입니다. 문서에 보이는 영어 단어를 빠짐없이(여러 페이지면 모든 페이지에서) 찾아 한국 중·고등학생용 학습 카드로 만들어 주세요.
-
-각 카드 규칙:
-- w: 영어 단어. 사진에 있는 철자 그대로, 정확하게.
-- m: 한국어 뜻 1~3개를 쉼표로 구분. 사진에 한국어 뜻이 적혀 있으면 그것을 우선 쓰되, 명백한 오탈자나 인식 오류는 표준 뜻으로 바로잡을 것. 뜻이 없으면 표준 뜻을 직접 작성.
-- p: 품사 (동사 / 명사 / 형용사 / 부사 / 연결어 등). 두 품사면 "명사/동사"처럼.
-- e: 그 단어가 들어간 8~12단어의 자연스러운 영어 예문. 중·고등학생 수준.
-- h: 어원 분해(예: "medi(중간)+ate → 중간에 서서 화해시키다") 또는 짧은 연상법. 한국어 40자 이내. 아주 쉬운 단어는 빈 문자열.
-- title: 이 자료를 알아볼 짧은 제목 (예: "에린데일 A 시험지", "수능 빈출 동사").
-
-번호·표 선·머리글은 무시하고 영어 단어만 추출하세요. 같은 단어가 여러 번 나오면 한 번만 넣으세요. 한국어 단어나 사람 이름은 넣지 마세요.`;
-
-function resizeToB64(file, maxSide) {
-  return new Promise((resolve, reject) => {
-    const img = new Image();
-    img.onload = () => {
-      const sc = Math.min(1, maxSide / Math.max(img.width, img.height));
-      const c = document.createElement("canvas");
-      c.width = Math.round(img.width * sc); c.height = Math.round(img.height * sc);
-      c.getContext("2d").drawImage(img, 0, 0, c.width, c.height);
-      URL.revokeObjectURL(img.src);
-      resolve(c.toDataURL("image/jpeg", 0.92).split(",")[1]);
-    };
-    img.onerror = () => reject(new Error("이미지를 읽지 못했습니다."));
-    img.src = URL.createObjectURL(file);
-  });
-}
-
-const SCHEMA = {
-  type: "object",
-  properties: {
-    title: { type: "string" },
-    cards: {
-      type: "array",
-      items: {
-        type: "object",
-        properties: { w: {type:"string"}, m: {type:"string"}, p: {type:"string"}, e: {type:"string"}, h: {type:"string"} },
-        required: ["w","m","p","e","h"], additionalProperties: false
-      }
-    }
-  },
-  required: ["title","cards"], additionalProperties: false
-};
-
-function fileToB64(file) {
-  return new Promise((resolve, reject) => {
-    const r = new FileReader();
-    r.onload = () => resolve(String(r.result).split(",")[1]);
-    r.onerror = () => reject(new Error("파일을 읽지 못했습니다."));
-    r.readAsDataURL(file);
-  });
-}
-
-async function callClaude(block) {
-  const key = S.settings.apiKey.trim();
-  if (!key) throw new Error("NOKEY");
-  const res = await fetch("https://api.anthropic.com/v1/messages", {
-    method: "POST",
-    headers: {
-      "content-type": "application/json",
-      "x-api-key": key,
-      "anthropic-version": "2023-06-01",
-      "anthropic-dangerous-direct-browser-access": "true",
-    },
-    body: JSON.stringify({
-      model: S.settings.model,
-      max_tokens: 16000,
-      output_config: { format: { type: "json_schema", schema: SCHEMA } },
-      messages: [{ role: "user", content: [block, { type: "text", text: SHOT_PROMPT }] }],
-    }),
-  });
-  if (!res.ok) {
-    let msg = "";
-    try { const j = await res.json(); msg = (j.error && j.error.message) || ""; } catch (e) {}
-    if (res.status === 401) throw new Error("KEYBAD");
-    if (res.status === 429) throw new Error("RATE");
-    if (res.status === 400 && /credit|balance/i.test(msg)) throw new Error("CREDIT::" + msg);
-    throw new Error("서버 오류 " + res.status + (msg ? " · " + msg : ""));
-  }
-  const j = await res.json();
-  const txt = (j.content.find(b => b.type === "text") || {}).text || "";
-  const parsed = JSON.parse(txt);
-  return parsed;
-}
-
 /* ========== 화면 공통 ========== */
 const app = document.getElementById("app");
 const tabsEl = document.getElementById("tabs");
-const camIn = document.getElementById("camIn");
 let tab = "home";
 const TABS = [
   { id: "home", ico: "🏠", lbl: "홈" },
@@ -419,11 +331,10 @@ function renderHome() {
   } else {
     heroHtml = `
       <div class="hero" style="text-align:center">
-        <div style="font-size:42px">📷</div>
-        <div class="title" style="margin-top:6px">외울 단어를 올려보세요</div>
-        <p class="muted">폰에서 사진의 <b>텍스트 추출</b>로 복사한 글자를 붙여넣거나,<br>스캔한 PDF를 올리면 단어장이 만들어집니다.</p>
-        <div class="actions"><button class="btn primary" onclick="renderPaste()">텍스트 붙여넣기 · 무료</button>
-         <button class="btn ghost" onclick="startShot()">PDF·사진 올리기</button></div>
+        <div style="font-size:42px">📋</div>
+        <div class="title" style="margin-top:6px">외울 단어를 붙여넣어 보세요</div>
+        <p class="muted">폰에서 단어장을 찍고 <b>텍스트 추출</b>로 복사한 뒤<br>여기에 붙여넣으면 단어장이 만들어집니다.</p>
+        <div class="actions"><button class="btn primary" onclick="renderPaste()">단어 붙여넣기</button></div>
       </div>`;
   }
   app.innerHTML = `
@@ -433,57 +344,12 @@ function renderHome() {
       <button class="tile rev" onclick="startReview()" ${due===0?"disabled":""}>
         <span class="num">${due}</span><span class="lbl">오늘 복습할 단어</span>
       </button>
-      <button class="tile shot" onclick="renderAddChooser()">
+      <button class="tile shot" onclick="renderPaste()">
         <span class="num">＋</span><span class="lbl">단어 추가</span>
       </button>
     </div>
     <p class="muted" style="text-align:center;margin-top:14px">완료한 묶음은 1일 → 3일 → 7일 → 30일 간격으로 다시 나옵니다.</p>`;
 }
-
-/* ========== 촬영 → 인식 → 확인 ========== */
-function startShot() {
-  if (!S.settings.apiKey.trim()) { go("settings"); setTimeout(() => alert("먼저 설정에서 Claude API 키를 입력해 주세요."), 100); return; }
-  camIn.value = "";
-  camIn.click();
-}
-camIn.onchange = async () => {
-  const f = camIn.files && camIn.files[0];
-  if (!f) return;
-  const isPdf = f.type === "application/pdf" || /\.pdf$/i.test(f.name);
-  showTabs(false);
-  app.innerHTML = `<div class="loading"><div class="spinner"></div>
-    <h2 style="font-size:17px">단어를 읽는 중…</h2>
-    <p class="muted">${isPdf ? "PDF" : "사진"} 속 단어를 찾아 뜻·예문·어원을 만들고 있습니다.<br>보통 20~60초 걸립니다.</p></div>`;
-  try {
-    let block;
-    if (isPdf) {
-      if (f.size > 20 * 1024 * 1024) throw new Error("PDF가 너무 큽니다(20MB 초과). 페이지를 나눠서 올려 주세요.");
-      block = { type: "document", source: { type: "base64", media_type: "application/pdf", data: await fileToB64(f) } };
-    } else {
-      const maxSide = S.settings.model.indexOf("haiku") >= 0 ? 1560 : 2000;
-      block = { type: "image", source: { type: "base64", media_type: "image/jpeg", data: await resizeToB64(f, maxSide) } };
-    }
-    const out = await callClaude(block);
-    let cards = (out.cards || []).filter(c => c.w && /[a-zA-Z]/.test(c.w));
-    const seen = new Set();
-    cards = cards.filter(c => { const k = c.w.toLowerCase().trim(); if (seen.has(k)) return false; seen.add(k); return true; });
-    if (!cards.length) throw new Error("파일에서 영어 단어를 찾지 못했습니다. 글자가 또렷하게 나오도록 다시 스캔해 주세요.");
-    renderConfirm(out.title || "새 단어 묶음", cards);
-  } catch (e) {
-    let msg = e.message;
-    if (msg === "NOKEY") msg = "설정에서 API 키를 먼저 입력해 주세요.";
-    else if (msg === "KEYBAD") msg = "API 키가 올바르지 않습니다. 설정에서 다시 확인해 주세요.";
-    else if (msg === "RATE") msg = "요청이 너무 잦습니다. 잠시 후 다시 시도해 주세요.";
-    else if (msg.indexOf("CREDIT::") === 0) {
-      msg = "API 크레딧이 부족합니다.\n\nconsole.anthropic.com → Billing → Purchase credits 에서 실제로 충전이 되었는지 확인해 주세요. Claude Pro·Max 구독은 API와 별개의 지갑입니다.\n\n서버 응답: " + msg.slice(8);
-    }
-    else if (/Failed to fetch|NetworkError/i.test(msg)) msg = "인터넷 연결을 확인해 주세요.";
-    app.innerHTML = `<div class="summary card"><div class="emoji">😕</div><h2>읽지 못했습니다</h2>
-      <p style="white-space:pre-line;text-align:left">${esc(msg)}</p>
-      <div class="actions"><button class="btn primary" onclick="startShot()">파일 다시 고르기</button>
-      <button class="btn ghost" onclick="go('home')">홈으로</button></div></div>`;
-  }
-};
 
 let CONF = null;
 function renderConfirm(title, cards) {
@@ -500,7 +366,7 @@ function renderConfirmBody() {
       <button class="del" onclick="delRow(${i})">✕</button>
     </div>`).join("");
   app.innerHTML = `
-    <div class="session-head"><span>인식 결과 확인</span><button onclick="go('home')">취소</button></div>
+    <div class="session-head"><span>단어 확인</span><button onclick="go('home')">취소</button></div>
     <div class="ok-notice">단어 ${CONF.cards.length}개를 찾았습니다.${blanks ? " 뜻이 비어 있는 " + blanks + "개는 채워 주세요." : " 틀린 곳만 눌러서 고친 뒤 시작하세요."}</div>
     <div class="card">
       <input type="text" value="${esc(CONF.title)}" style="width:100%;font-weight:700;margin-bottom:6px" oninput="CONF.title=this.value">
@@ -508,7 +374,7 @@ function renderConfirmBody() {
     </div>
     <div class="actions">
       <button class="btn primary" onclick="saveBatch()">이 단어들 외우기 시작</button>
-      <button class="btn ghost" onclick="renderAddChooser()">다른 방법으로 추가</button>
+      <button class="btn ghost" onclick="renderPaste()">다시 붙여넣기</button>
     </div>`;
 }
 function delRow(i) { CONF.cards.splice(i, 1); renderConfirmBody(); }
@@ -529,24 +395,6 @@ function saveBatch() {
 }
 
 /* ========== 텍스트 붙여넣기로 추가 (무료) ========== */
-function renderAddChooser() {
-  showTabs(true);
-  app.innerHTML = `
-    <header class="top"><h1>단어 추가</h1></header>
-    <div class="card">
-      <h2>텍스트 붙여넣기 · 무료</h2>
-      <p class="muted">폰에서 사진을 찍고 <b>텍스트 추출(복사)</b>한 내용을 그대로 붙여넣으세요.
-      요금이 전혀 들지 않습니다.</p>
-      <div class="actions"><button class="btn primary" onclick="renderPaste()">붙여넣기로 만들기</button></div>
-    </div>
-    <div class="card">
-      <h2>파일 올리기 · 장당 약 35원</h2>
-      <p class="muted">스캔한 PDF나 사진을 올리면 뜻뿐 아니라 <b>예문과 어원 힌트까지</b> 자동으로 만들어집니다.
-      Claude API 키와 크레딧이 필요합니다.</p>
-      <div class="actions"><button class="btn ghost" onclick="startShot()">PDF·사진 올리기</button></div>
-    </div>`;
-}
-
 function renderPaste() {
   showTabs(false);
   app.innerHTML = `
@@ -715,7 +563,7 @@ function renderBatchDone(b) {
     <p>${b.cards.length}개 단어를 모두 통과했습니다.</p>
     <p style="margin-top:8px">이제 이 단어들은 복습 목록으로 넘어가<br>1일 → 3일 → 7일 → 30일 간격으로 다시 나옵니다.</p>
     <div class="actions">
-      <button class="btn primary" onclick="renderAddChooser()">＋ 다음 단어 추가하기</button>
+      <button class="btn primary" onclick="renderPaste()">＋ 다음 단어 추가하기</button>
       <button class="btn ghost" onclick="resetBatch('${b.id}')">이 묶음 처음부터 다시</button>
       <button class="btn ghost" onclick="go('home')">홈으로</button>
     </div></div>`;
@@ -890,31 +738,8 @@ function renderStats() {
 /* ========== 설정 ========== */
 function renderSettings() {
   showTabs(true);
-  const k = S.settings.apiKey;
-  const masked = k ? k.slice(0, 7) + "•".repeat(10) + k.slice(-4) : "";
   app.innerHTML = `
     <header class="top"><h1>설정</h1></header>
-    <div class="card">
-      <h2>Claude API 키</h2>
-      ${k ? `<div class="ok-notice">키가 등록되어 있습니다 · ${esc(masked)}</div>`
-          : `<div class="notice">파일 인식 기능을 쓰려면 키가 필요합니다.</div>`}
-      <input type="password" id="keyIn" placeholder="sk-ant-..." style="width:100%" value="">
-      <div class="actions" style="margin-top:10px">
-        <button class="btn primary" onclick="saveKey()">키 저장</button>
-        ${k ? `<button class="btn ghost" onclick="clearKey()">키 삭제</button>` : ""}
-      </div>
-      <p class="muted" style="margin-top:10px">키는 이 기기 안에만 저장되며 어디에도 전송되지 않습니다.
-      <a href="https://console.anthropic.com/settings/keys" target="_blank" style="color:var(--accent)">키 발급받기 →</a></p>
-    </div>
-    <div class="card">
-      <h2>인식 품질</h2>
-      <div class="setting-row"><span>사용 모델</span>
-        <select onchange="S.settings.model=this.value;save();renderSettings()">
-          <option value="claude-haiku-4-5" ${S.settings.model==="claude-haiku-4-5"?"selected":""}>기본 (장당 약 35원)</option>
-          <option value="claude-sonnet-5" ${S.settings.model==="claude-sonnet-5"?"selected":""}>정밀 (장당 약 90원)</option>
-        </select></div>
-      <p class="muted">글씨가 작거나 흐린 자료는 정밀을 쓰면 더 잘 읽습니다.</p>
-    </div>
     <div class="card">
       <h2>학습</h2>
       <div class="setting-row"><span>하루 새 단어 <span class="muted">(10~20 권장)</span></span>
@@ -938,13 +763,6 @@ function renderSettings() {
       <div class="setting-row"><span class="muted">모든 기록 삭제</span><button class="danger-link" onclick="resetAll()">초기화</button></div>
     </div>`;
 }
-function saveKey() {
-  const v = document.getElementById("keyIn").value.trim();
-  if (!v) { alert("키를 입력해 주세요."); return; }
-  S.settings.apiKey = v; save(); renderSettings();
-  alert("저장했습니다. 이제 홈에서 파일을 올려보세요.");
-}
-function clearKey() { if (confirm("저장된 키를 삭제할까요?")) { S.settings.apiKey = ""; save(); renderSettings(); } }
 function exportData() { navigator.clipboard.writeText(localStorage.getItem(KEY) || "").then(() => alert("학습 기록을 클립보드에 복사했습니다.")).catch(() => alert("복사에 실패했습니다.")); }
 function resetAll() { if (confirm("모든 묶음과 학습 기록을 삭제할까요? 되돌릴 수 없습니다.")) { localStorage.removeItem(KEY); S = load(); go("home"); } }
 
