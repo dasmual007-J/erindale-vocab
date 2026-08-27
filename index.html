@@ -137,7 +137,7 @@
 <body>
 <div id="app"></div>
 <nav class="tabs" id="tabs"></nav>
-<input type="file" id="camIn" accept="image/*" capture="environment" style="display:none">
+<input type="file" id="camIn" accept="application/pdf,image/*" style="display:none">
 
 <script src="data/set_a.js"></script>
 <script src="data/set_a1.js"></script>
@@ -285,7 +285,7 @@ async function enrichBatch(b) {
 }
 
 /* ========== Claude API: 사진 → 카드 ========== */
-const SHOT_PROMPT = `이 사진은 영어 단어 학습 자료입니다. 사진에 보이는 영어 단어를 빠짐없이 찾아 한국 중·고등학생용 학습 카드로 만들어 주세요.
+const SHOT_PROMPT = `이 파일은 영어 단어 학습 자료입니다. 문서에 보이는 영어 단어를 빠짐없이(여러 페이지면 모든 페이지에서) 찾아 한국 중·고등학생용 학습 카드로 만들어 주세요.
 
 각 카드 규칙:
 - w: 영어 단어. 사진에 있는 철자 그대로, 정확하게.
@@ -329,7 +329,16 @@ const SCHEMA = {
   required: ["title","cards"], additionalProperties: false
 };
 
-async function callClaude(b64) {
+function fileToB64(file) {
+  return new Promise((resolve, reject) => {
+    const r = new FileReader();
+    r.onload = () => resolve(String(r.result).split(",")[1]);
+    r.onerror = () => reject(new Error("파일을 읽지 못했습니다."));
+    r.readAsDataURL(file);
+  });
+}
+
+async function callClaude(block) {
   const key = S.settings.apiKey.trim();
   if (!key) throw new Error("NOKEY");
   const res = await fetch("https://api.anthropic.com/v1/messages", {
@@ -344,10 +353,7 @@ async function callClaude(b64) {
       model: S.settings.model,
       max_tokens: 16000,
       output_config: { format: { type: "json_schema", schema: SCHEMA } },
-      messages: [{ role: "user", content: [
-        { type: "image", source: { type: "base64", media_type: "image/jpeg", data: b64 } },
-        { type: "text", text: SHOT_PROMPT },
-      ]}],
+      messages: [{ role: "user", content: [block, { type: "text", text: SHOT_PROMPT }] }],
     }),
   });
   if (!res.ok) {
@@ -355,7 +361,7 @@ async function callClaude(b64) {
     try { const j = await res.json(); msg = (j.error && j.error.message) || ""; } catch (e) {}
     if (res.status === 401) throw new Error("KEYBAD");
     if (res.status === 429) throw new Error("RATE");
-    if (res.status === 400 && /credit|balance/i.test(msg)) throw new Error("CREDIT");
+    if (res.status === 400 && /credit|balance/i.test(msg)) throw new Error("CREDIT::" + msg);
     throw new Error("서버 오류 " + res.status + (msg ? " · " + msg : ""));
   }
   const j = await res.json();
@@ -414,9 +420,9 @@ function renderHome() {
     heroHtml = `
       <div class="hero" style="text-align:center">
         <div style="font-size:42px">📷</div>
-        <div class="title" style="margin-top:6px">외울 단어를 찍어보세요</div>
-        <p class="muted">단어장이나 시험지를 촬영하면 뜻·예문·어원까지 자동으로 만들어집니다.</p>
-        <div class="actions"><button class="btn primary" onclick="startShot()">사진 찍기</button></div>
+        <div class="title" style="margin-top:6px">외울 단어를 올려보세요</div>
+        <p class="muted">폰 카메라로 스캔한 PDF나 사진을 올리면<br>뜻·예문·어원까지 자동으로 만들어집니다.</p>
+        <div class="actions"><button class="btn primary" onclick="startShot()">파일 올리기</button></div>
       </div>`;
   }
   app.innerHTML = `
@@ -427,7 +433,7 @@ function renderHome() {
         <span class="num">${due}</span><span class="lbl">오늘 복습할 단어</span>
       </button>
       <button class="tile shot" onclick="startShot()">
-        <span class="num">＋</span><span class="lbl">${b ? "새 사진 찍기" : "사진으로 추가"}</span>
+        <span class="num">＋</span><span class="lbl">${b ? "새 파일 올리기" : "파일로 추가"}</span>
       </button>
     </div>
     <p class="muted" style="text-align:center;margin-top:14px">완료한 묶음은 1일 → 3일 → 7일 → 30일 간격으로 다시 나옵니다.</p>`;
@@ -442,29 +448,38 @@ function startShot() {
 camIn.onchange = async () => {
   const f = camIn.files && camIn.files[0];
   if (!f) return;
+  const isPdf = f.type === "application/pdf" || /\.pdf$/i.test(f.name);
   showTabs(false);
   app.innerHTML = `<div class="loading"><div class="spinner"></div>
     <h2 style="font-size:17px">단어를 읽는 중…</h2>
-    <p class="muted">사진 속 단어를 찾아 뜻·예문·어원을 만들고 있습니다.<br>보통 20~60초 걸립니다.</p></div>`;
+    <p class="muted">${isPdf ? "PDF" : "사진"} 속 단어를 찾아 뜻·예문·어원을 만들고 있습니다.<br>보통 20~60초 걸립니다.</p></div>`;
   try {
-    const maxSide = S.settings.model.indexOf("haiku") >= 0 ? 1560 : 2000;
-    const b64 = await resizeToB64(f, maxSide);
-    const out = await callClaude(b64);
+    let block;
+    if (isPdf) {
+      if (f.size > 20 * 1024 * 1024) throw new Error("PDF가 너무 큽니다(20MB 초과). 페이지를 나눠서 올려 주세요.");
+      block = { type: "document", source: { type: "base64", media_type: "application/pdf", data: await fileToB64(f) } };
+    } else {
+      const maxSide = S.settings.model.indexOf("haiku") >= 0 ? 1560 : 2000;
+      block = { type: "image", source: { type: "base64", media_type: "image/jpeg", data: await resizeToB64(f, maxSide) } };
+    }
+    const out = await callClaude(block);
     let cards = (out.cards || []).filter(c => c.w && /[a-zA-Z]/.test(c.w));
     const seen = new Set();
     cards = cards.filter(c => { const k = c.w.toLowerCase().trim(); if (seen.has(k)) return false; seen.add(k); return true; });
-    if (!cards.length) throw new Error("사진에서 영어 단어를 찾지 못했습니다. 글자가 선명하게 나오도록 다시 찍어 주세요.");
+    if (!cards.length) throw new Error("파일에서 영어 단어를 찾지 못했습니다. 글자가 또렷하게 나오도록 다시 스캔해 주세요.");
     renderConfirm(out.title || "새 단어 묶음", cards);
   } catch (e) {
     let msg = e.message;
     if (msg === "NOKEY") msg = "설정에서 API 키를 먼저 입력해 주세요.";
     else if (msg === "KEYBAD") msg = "API 키가 올바르지 않습니다. 설정에서 다시 확인해 주세요.";
     else if (msg === "RATE") msg = "요청이 너무 잦습니다. 잠시 후 다시 시도해 주세요.";
-    else if (msg === "CREDIT") msg = "API 크레딧이 부족합니다. Anthropic 콘솔에서 충전해 주세요.";
+    else if (msg.indexOf("CREDIT::") === 0) {
+      msg = "API 크레딧이 부족합니다.\n\nconsole.anthropic.com → Billing → Purchase credits 에서 실제로 충전이 되었는지 확인해 주세요. Claude Pro·Max 구독은 API와 별개의 지갑입니다.\n\n서버 응답: " + msg.slice(8);
+    }
     else if (/Failed to fetch|NetworkError/i.test(msg)) msg = "인터넷 연결을 확인해 주세요.";
-    app.innerHTML = `<div class="summary card"><div class="emoji">😕</div><h2>인식하지 못했습니다</h2>
-      <p>${esc(msg)}</p>
-      <div class="actions"><button class="btn primary" onclick="startShot()">다시 찍기</button>
+    app.innerHTML = `<div class="summary card"><div class="emoji">😕</div><h2>읽지 못했습니다</h2>
+      <p style="white-space:pre-line;text-align:left">${esc(msg)}</p>
+      <div class="actions"><button class="btn primary" onclick="startShot()">파일 다시 고르기</button>
       <button class="btn ghost" onclick="go('home')">홈으로</button></div></div>`;
   }
 };
@@ -491,7 +506,7 @@ function renderConfirmBody() {
     </div>
     <div class="actions">
       <button class="btn primary" onclick="saveBatch()">이 단어들 외우기 시작</button>
-      <button class="btn ghost" onclick="startShot()">다시 찍기</button>
+      <button class="btn ghost" onclick="startShot()">다른 파일 고르기</button>
     </div>`;
 }
 function delRow(i) { CONF.cards.splice(i, 1); renderConfirmBody(); }
@@ -620,7 +635,7 @@ function renderBatchDone(b) {
     <p>${b.cards.length}개 단어를 모두 통과했습니다.</p>
     <p style="margin-top:8px">이제 이 단어들은 복습 목록으로 넘어가<br>1일 → 3일 → 7일 → 30일 간격으로 다시 나옵니다.</p>
     <div class="actions">
-      <button class="btn primary" onclick="startShot()">📷 새 사진 찍기</button>
+      <button class="btn primary" onclick="startShot()">📄 새 파일 올리기</button>
       <button class="btn ghost" onclick="resetBatch('${b.id}')">이 묶음 처음부터 다시</button>
       <button class="btn ghost" onclick="go('home')">홈으로</button>
     </div></div>`;
@@ -718,7 +733,7 @@ function renderLibrary() {
       </div>
       <button class="go ${b.done?"gray":""}" onclick="openBatch('${b.id}')">${label}</button>
       <button class="del" onclick="delBatch('${b.id}')">✕</button></div>`;
-  }).join("") || `<p class="muted">아직 만든 묶음이 없습니다. 홈에서 사진을 찍어보세요.</p>`;
+  }).join("") || `<p class="muted">아직 만든 묶음이 없습니다. 홈에서 파일을 올려보세요.</p>`;
 
   const builtin = BUILTIN_ORDER.filter(s => BUILTIN[s]).map(sid => {
     const s = BUILTIN[sid];
@@ -733,7 +748,7 @@ function renderLibrary() {
 
   app.innerHTML = `
     <header class="top"><h1>보관함</h1></header>
-    <div class="card"><h2>내가 찍은 묶음</h2>${mine}</div>
+    <div class="card"><h2>내가 만든 묶음</h2>${mine}</div>
     <div class="card"><h2>에린데일 기본 단어장</h2>${builtin}</div>`;
 }
 function openBatch(id) {
@@ -802,7 +817,7 @@ function renderSettings() {
     <div class="card">
       <h2>Claude API 키</h2>
       ${k ? `<div class="ok-notice">키가 등록되어 있습니다 · ${esc(masked)}</div>`
-          : `<div class="notice">사진 촬영 기능을 쓰려면 키가 필요합니다.</div>`}
+          : `<div class="notice">파일 인식 기능을 쓰려면 키가 필요합니다.</div>`}
       <input type="password" id="keyIn" placeholder="sk-ant-..." style="width:100%" value="">
       <div class="actions" style="margin-top:10px">
         <button class="btn primary" onclick="saveKey()">키 저장</button>
@@ -847,7 +862,7 @@ function saveKey() {
   const v = document.getElementById("keyIn").value.trim();
   if (!v) { alert("키를 입력해 주세요."); return; }
   S.settings.apiKey = v; save(); renderSettings();
-  alert("저장했습니다. 이제 홈에서 사진을 찍어보세요.");
+  alert("저장했습니다. 이제 홈에서 파일을 올려보세요.");
 }
 function clearKey() { if (confirm("저장된 키를 삭제할까요?")) { S.settings.apiKey = ""; save(); renderSettings(); } }
 function exportData() { navigator.clipboard.writeText(localStorage.getItem(KEY) || "").then(() => alert("학습 기록을 클립보드에 복사했습니다.")).catch(() => alert("복사에 실패했습니다.")); }
