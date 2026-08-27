@@ -103,12 +103,17 @@
     border-top-color: var(--accent); border-radius: 50%; animation: spin 1s linear infinite; }
   @keyframes spin { to { transform: rotate(360deg); } }
 
-  .edit-row { display: flex; gap: 8px; align-items: center; padding: 8px 0; border-bottom: 1px solid var(--line); }
+  .edit-row { padding: 9px 0; border-bottom: 1px solid var(--line); }
+  .edit-row .line { display: flex; gap: 7px; align-items: center; }
+  .edit-row .line + .line { margin-top: 6px; }
   .edit-row input { font-family: inherit; font-size: 15px; padding: 8px 9px; border: 1px solid var(--line);
-    border-radius: 8px; background: var(--card); min-width: 0; }
-  .edit-row .w { flex: 0 0 38%; font-weight: 700; }
-  .edit-row .m { flex: 1; }
-  .edit-row .del { flex: 0 0 30px; background: none; border: none; color: var(--warn); font-size: 18px; cursor: pointer; }
+    border-radius: 8px; background: var(--card); color: var(--ink); min-width: 0; flex: 1; }
+  .edit-row .w { font-weight: 700; }
+  .edit-row .m.empty { border-color: var(--warn); background: var(--warn-soft); }
+  .edit-row .dic { flex: 0 0 auto; background: var(--blue-soft); color: var(--blue); border: none;
+    font-family: inherit; font-size: 13px; font-weight: 700; padding: 9px 11px; border-radius: 8px;
+    cursor: pointer; text-decoration: none; white-space: nowrap; }
+  .edit-row .del { flex: 0 0 32px; background: none; border: none; color: var(--warn); font-size: 18px; cursor: pointer; }
 
   .stat-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
   .stat { background: var(--card); border: 1px solid var(--line); border-radius: var(--radius); padding: 14px; }
@@ -361,9 +366,15 @@ function renderConfirmBody() {
   const blanks = CONF.cards.filter(c => !String(c.m || "").trim()).length;
   const rows = CONF.cards.map((c, i) => `
     <div class="edit-row">
-      <input class="w" value="${esc(c.w)}" oninput="CONF.cards[${i}].w=this.value">
-      <input class="m" value="${esc(c.m)}" placeholder="뜻" oninput="CONF.cards[${i}].m=this.value">
-      <button class="del" onclick="delRow(${i})">✕</button>
+      <div class="line">
+        <input class="w" value="${esc(c.w)}" oninput="CONF.cards[${i}].w=this.value">
+        <a class="dic" href="${dicUrl(c.w)}" target="_blank" rel="noopener">사전</a>
+        <button class="del" onclick="delRow(${i})">✕</button>
+      </div>
+      <div class="line">
+        <input class="m ${String(c.m||"").trim() ? "" : "empty"}" value="${esc(c.m)}" placeholder="뜻을 입력하세요"
+          oninput="CONF.cards[${i}].m=this.value; this.classList.toggle('empty', !this.value.trim())">
+      </div>
     </div>`).join("");
   app.innerHTML = `
     <div class="session-head"><span>단어 확인</span><button onclick="go('home')">취소</button></div>
@@ -376,6 +387,10 @@ function renderConfirmBody() {
       <button class="btn primary" onclick="saveBatch()">이 단어들 외우기 시작</button>
       <button class="btn ghost" onclick="renderPaste()">다시 붙여넣기</button>
     </div>`;
+}
+function dicUrl(w) {
+  const q = encodeURIComponent(String(w || "").split("/")[0].trim());
+  return "https://en.dict.naver.com/#/search?query=" + q;
 }
 function delRow(i) { CONF.cards.splice(i, 1); renderConfirmBody(); }
 function saveBatch() {
