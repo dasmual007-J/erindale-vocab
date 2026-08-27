@@ -176,7 +176,7 @@ function load() {
 }
 function fresh() {
   return {
-    settings: { newPerDay: 10, ttsRate: 0.9, mastery: 3, useDictApi: true, geminiKey: "", geminiModel: "" },
+    settings: { newPerDay: 10, ttsRate: 0.9, mastery: 3, useDictApi: true, geminiKey: "", geminiModel: "", geminiModels: [] },
     batches: {},        // id -> {id,name,created,cards:[{w,m,p,e,h,ipa,audio}],done,doneAt}
     active: null,       // 현재 학습 중 묶음 id
     prog: {},           // "batchId#idx" -> {seen,streak,mastered,iv,due,ef,reps,lapses}
@@ -298,8 +298,11 @@ const GEM_SCHEMA = {
     required: ["w","m","p","e","h"]
   }
 };
+const sleep = (ms) => new Promise(r => setTimeout(r, ms));
 
-async function gemPickModel(key) {
+/* 사용 가능한 flash 모델 목록 (좋은 것부터) */
+async function gemModels(key) {
+  if (S.settings.geminiModels && S.settings.geminiModels.length) return S.settings.geminiModels;
   const r = await fetch(GEM_BASE + "/models?key=" + encodeURIComponent(key));
   if (!r.ok) {
     if (r.status === 400 || r.status === 403) throw new Error("KEYBAD");
@@ -308,49 +311,80 @@ async function gemPickModel(key) {
   const j = await r.json();
   const usable = (j.models || []).filter(m =>
     (m.supportedGenerationMethods || []).indexOf("generateContent") >= 0 &&
-    /flash/i.test(m.name) && !/vision|embedding|image|tts|live/i.test(m.name));
+    /flash/i.test(m.name) && !/vision|embedding|image|tts|live|thinking/i.test(m.name));
   usable.sort((a, b) => {
-    const s = (n) => (/lite/i.test(n) ? 0 : 1) * 10 + (parseFloat((n.match(/(\d+\.\d+)/) || [0,0])[1]) || 0);
-    return s(b.name) - s(a.name);
+    const score = (n) => (parseFloat((n.match(/([0-9]+\.[0-9]+)/) || [0, 0])[1]) || 0) * 10 + (/lite/i.test(n) ? -1 : 0);
+    return score(b.name) - score(a.name);
   });
   if (!usable.length) throw new Error("사용 가능한 모델이 없습니다.");
-  return usable[0].name.replace(/^models\//, "");
+  const list = usable.map(m => String(m.name).split("models/").pop()).slice(0, 4);
+  S.settings.geminiModels = list; S.settings.geminiModel = list[0]; save();
+  return list;
 }
 
-async function gemFill(words) {
-  const key = (S.settings.geminiKey || "").trim();
-  if (!key) throw new Error("NOKEY");
-  if (!S.settings.geminiModel) { S.settings.geminiModel = await gemPickModel(key); save(); }
-  const prompt =
-    "다음 영어 단어들의 한국 중·고등학생용 학습 카드를 만들어 주세요.\n\n" +
-    "각 단어마다:\n" +
-    "- w: 주어진 영어 단어 그대로\n" +
-    "- m: 한국어 뜻 1~3개, 쉼표로 구분\n" +
-    "- p: 품사 (동사/명사/형용사/부사 등)\n" +
-    "- e: 그 단어가 들어간 8~12단어의 자연스러운 영어 예문\n" +
-    "- h: 어원 분해나 짧은 연상법, 한국어 40자 이내 (쉬운 단어는 빈 문자열)\n\n" +
-    "단어 목록:\n" + words.join("\n");
+function gemPrompt(words) {
+  return [
+    "다음 영어 단어들의 한국 중·고등학생용 학습 카드를 만들어 주세요.",
+    "",
+    "각 단어마다:",
+    "- w: 주어진 영어 단어 그대로",
+    "- m: 한국어 뜻 1~3개, 쉼표로 구분",
+    "- p: 품사 (동사/명사/형용사/부사 등)",
+    "- e: 그 단어가 들어간 8~12단어의 자연스러운 영어 예문",
+    "- h: 어원 분해나 짧은 연상법, 한국어 40자 이내 (쉬운 단어는 빈 문자열)",
+    "",
+    "단어 목록:",
+    words.join("\n")
+  ].join("\n");
+}
 
-  const r = await fetch(GEM_BASE + "/models/" + S.settings.geminiModel + ":generateContent?key=" + encodeURIComponent(key), {
+/* 한 번 호출. 일시적 오류는 retryable 표시 */
+async function gemCall(model, words, key) {
+  const r = await fetch(GEM_BASE + "/models/" + model + ":generateContent?key=" + encodeURIComponent(key), {
     method: "POST",
     headers: { "content-type": "application/json" },
     body: JSON.stringify({
-      contents: [{ parts: [{ text: prompt }] }],
+      contents: [{ parts: [{ text: gemPrompt(words) }] }],
       generationConfig: { responseMimeType: "application/json", responseSchema: GEM_SCHEMA, temperature: 0.3 },
     }),
   });
   if (!r.ok) {
     let msg = ""; try { const j = await r.json(); msg = (j.error || {}).message || ""; } catch (e) {}
-    if (r.status === 400 && /API key/i.test(msg)) throw new Error("KEYBAD");
-    if (r.status === 403) throw new Error("KEYBAD");
-    if (r.status === 429) throw new Error("무료 사용량을 다 썼습니다. 잠시 후 다시 시도해 주세요.");
-    if (r.status === 404) { S.settings.geminiModel = ""; save(); throw new Error("모델을 찾지 못했습니다. 다시 시도해 주세요."); }
-    throw new Error("오류 " + r.status + (msg ? " · " + msg : ""));
+    const err = new Error(msg || ("오류 " + r.status));
+    err.status = r.status;
+    if (r.status === 403 || (r.status === 400 && /API key/i.test(msg))) { err.code = "KEYBAD"; }
+    else if (r.status === 404) { err.code = "NOMODEL"; }
+    else if (r.status === 429 || r.status === 500 || r.status === 503 || r.status === 502) { err.retryable = true; }
+    throw err;
   }
   const j = await r.json();
-  const txt = (((j.candidates || [])[0] || {}).content || {}).parts;
-  if (!txt || !txt.length) throw new Error("응답이 비어 있습니다.");
-  return JSON.parse(txt[0].text);
+  const parts = (((j.candidates || [])[0] || {}).content || {}).parts;
+  if (!parts || !parts.length) { const e = new Error("응답이 비어 있습니다."); e.retryable = true; throw e; }
+  return JSON.parse(parts[0].text);
+}
+
+/* 모델·재시도 조합으로 끝까지 시도 */
+async function gemFill(words, onNote) {
+  const key = (S.settings.geminiKey || "").trim();
+  if (!key) throw new Error("NOKEY");
+  const models = await gemModels(key);
+  let last = null;
+  for (let mi = 0; mi < models.length; mi++) {
+    for (let a = 0; a < 3; a++) {
+      try { return await gemCall(models[mi], words, key); }
+      catch (e) {
+        last = e;
+        if (e.code === "KEYBAD") throw e;
+        if (e.code === "NOMODEL") break;
+        if (!e.retryable) throw e;
+        if (onNote) onNote("서버가 붐빕니다. 다시 시도하는 중… (" + (a + 2) + "/3)");
+        await sleep(1200 * (a + 1));
+      }
+    }
+    if (mi + 1 < models.length && onNote) onNote("다른 모델로 바꿔서 시도하는 중…");
+  }
+  const e = new Error("구글 서버가 계속 붐빕니다. 잠시 후 다시 눌러 주세요. 이미 채워진 뜻은 그대로 남아 있습니다.");
+  e.overload = true; e.cause = last; throw e;
 }
 
 /* ========== 화면 공통 ========== */
@@ -463,28 +497,45 @@ async function doGemFill() {
     go("settings"); return;
   }
   const btn = document.getElementById("gemBtn");
-  if (btn) { btn.disabled = true; btn.textContent = "제미나이가 뜻을 만드는 중…"; }
-  try {
-    const got = await gemFill(blanks.map(c => c.w));
-    const byWord = {};
-    for (const g of got) if (g && g.w) byWord[String(g.w).toLowerCase().trim()] = g;
-    let n = 0;
-    for (const c of CONF.cards) {
-      const g = byWord[c.w.toLowerCase().trim()];
-      if (!g || String(c.m || "").trim()) continue;
-      c.m = g.m || ""; c.p = c.p || g.p || ""; c.e = c.e || g.e || ""; c.h = c.h || g.h || "";
-      if (c.m) { S.userDict[c.w.toLowerCase()] = { m: c.m, p: c.p, e: c.e, h: c.h }; n++; }
+  const setLabel = (t) => { const b = document.getElementById("gemBtn"); if (b) { b.disabled = true; b.textContent = t; } };
+  if (btn) btn.disabled = true;
+
+  // 15개씩 나눠서 처리 — 중간에 실패해도 앞부분은 남는다
+  const CHUNK = 15;
+  const groups = [];
+  for (let i = 0; i < blanks.length; i += CHUNK) groups.push(blanks.slice(i, i + CHUNK));
+  let filled = 0, failMsg = "";
+
+  for (let gi = 0; gi < groups.length; gi++) {
+    const label = groups.length > 1 ? ` (${gi + 1}/${groups.length})` : "";
+    setLabel("제미나이가 뜻을 만드는 중…" + label);
+    try {
+      const got = await gemFill(groups[gi].map(c => c.w), (note) => setLabel(note + label));
+      const byWord = {};
+      for (const g of got || []) if (g && g.w) byWord[String(g.w).toLowerCase().trim()] = g;
+      for (const c of CONF.cards) {
+        const g = byWord[c.w.toLowerCase().trim()];
+        if (!g || String(c.m || "").trim()) continue;
+        c.m = g.m || ""; c.p = c.p || g.p || ""; c.e = c.e || g.e || ""; c.h = c.h || g.h || "";
+        if (c.m) { S.userDict[c.w.toLowerCase()] = { m: c.m, p: c.p, e: c.e, h: c.h }; filled++; }
+      }
+      save();
+    } catch (e) {
+      const m = e.message;
+      if (m === "NOKEY") failMsg = "설정에서 제미나이 API 키를 입력해 주세요.";
+      else if (m === "KEYBAD" || e.code === "KEYBAD") failMsg = "API 키가 올바르지 않습니다. 설정에서 다시 확인해 주세요.";
+      else if (/Failed to fetch|NetworkError/i.test(m)) failMsg = "인터넷 연결을 확인해 주세요.";
+      else failMsg = m;
+      break;
     }
-    save();
-    renderConfirmBody();
-    if (!n) alert("뜻을 받지 못했습니다. 다시 시도해 주세요.");
-  } catch (e) {
-    let msg = e.message;
-    if (msg === "NOKEY") msg = "설정에서 제미나이 API 키를 입력해 주세요.";
-    else if (msg === "KEYBAD") msg = "API 키가 올바르지 않습니다. 설정에서 다시 확인해 주세요.";
-    else if (/Failed to fetch|NetworkError/i.test(msg)) msg = "인터넷 연결을 확인해 주세요.";
-    alert(msg);
-    renderConfirmBody();
+  }
+
+  renderConfirmBody();
+  if (failMsg) {
+    const left = CONF.cards.filter(c => !String(c.m || "").trim()).length;
+    alert(failMsg + (filled ? `\n\n${filled}개는 채웠습니다. 남은 ${left}개는 버튼을 다시 눌러 주세요.` : ""));
+  } else if (!filled) {
+    alert("뜻을 받지 못했습니다. 잠시 후 다시 눌러 주세요.");
   }
 }
 function dicUrl(w) {
@@ -911,8 +962,12 @@ async function saveGemKey() {
   const btn = document.querySelector('button[onclick="saveGemKey()"]');
   if (btn) { btn.disabled = true; btn.textContent = "확인 중…"; }
   try {
-    const model = await gemPickModel(v);
-    S.settings.geminiKey = v; S.settings.geminiModel = model; save();
+    S.settings.geminiModels = [];
+    const saved = S.settings.geminiKey;
+    S.settings.geminiKey = v;
+    let list;
+    try { list = await gemModels(v); } catch (err) { S.settings.geminiKey = saved; throw err; }
+    S.settings.geminiModel = list[0]; save();
     renderSettings();
     alert("연결됐습니다. 이제 단어 확인 화면에서 뜻을 자동으로 채울 수 있습니다.");
   } catch (e) {
