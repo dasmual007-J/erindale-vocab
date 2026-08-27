@@ -395,18 +395,31 @@ function saveBatch() {
 }
 
 /* ========== 텍스트 붙여넣기로 추가 (무료) ========== */
-function renderPaste() {
+function renderPaste(prefill, notice) {
   showTabs(false);
   app.innerHTML = `
     <div class="session-head"><span>텍스트 붙여넣기</span><button onclick="go('home')">취소</button></div>
+    ${notice ? `<div class="notice">${esc(notice)}</div>` : ""}
     <div class="card">
       <p class="muted" style="margin-bottom:9px">추출한 글자를 그대로 붙여넣으세요.
       번호나 표 모양이 섞여 있어도 알아서 정리합니다.</p>
       <textarea id="pasteIn" rows="12" placeholder="1 mediate 중재하다&#10;2 meditate 명상하다&#10;3 lessen 줄이다&#10;&#10;또는 단어만 있어도 됩니다"
-        style="width:100%;font-family:inherit;font-size:15px;line-height:1.6;padding:11px;border:1px solid var(--line);border-radius:10px;background:var(--card);color:var(--ink);resize:vertical"></textarea>
+        style="width:100%;font-family:inherit;font-size:15px;line-height:1.6;padding:11px;border:1px solid var(--line);border-radius:10px;background:var(--card);color:var(--ink);resize:vertical">${esc(prefill || "")}</textarea>
     </div>
     <div class="actions"><button class="btn primary" onclick="doParse()">단어 뽑아내기</button></div>`;
-  setTimeout(() => { const t = document.getElementById("pasteIn"); if (t) t.focus(); }, 80);
+  if (!prefill) setTimeout(() => { const t = document.getElementById("pasteIn"); if (t) t.focus(); }, 80);
+}
+
+/* 공유하기로 들어온 텍스트 처리 (Android 공유 메뉴 / iOS 단축어 / 링크) */
+function handleShared() {
+  const q = new URLSearchParams(location.search);
+  const txt = [q.get("text"), q.get("title"), q.get("url")].filter(Boolean).join("\n").trim();
+  if (!txt) return false;
+  try { history.replaceState(null, "", location.pathname); } catch (e) {}
+  const cards = parsePasted(txt);
+  if (cards.length) renderConfirm("공유받은 단어 · " + today(), cards);
+  else renderPaste(txt, "공유받은 글에서 영어 단어를 찾지 못했습니다. 내용을 확인하고 고쳐 주세요.");
+  return true;
 }
 
 const HEADER_WORDS = /^(no|num|word|words|meaning|means|day|unit|page|test|name|class|date)$/i;
@@ -767,7 +780,7 @@ function exportData() { navigator.clipboard.writeText(localStorage.getItem(KEY) 
 function resetAll() { if (confirm("모든 묶음과 학습 기록을 삭제할까요? 되돌릴 수 없습니다.")) { localStorage.removeItem(KEY); S = load(); go("home"); } }
 
 /* 시작 */
-go("home");
+if (!handleShared()) go("home");
 if ("serviceWorker" in navigator && (location.protocol === "https:" || location.hostname === "localhost")) {
   navigator.serviceWorker.register("sw.js").catch(() => {});
 }
