@@ -1,4 +1,4 @@
-const CACHE = "vocab-app-v6";
+const CACHE = "vocab-app-v7";
 const FILES = [
   "./", "./index.html", "./manifest.json", "./icon-192.png", "./icon-512.png",
   "./data/set_a.js", "./data/set_a1.js", "./data/set_b.js", "./data/set_b1.js",

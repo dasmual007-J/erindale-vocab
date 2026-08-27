@@ -176,7 +176,7 @@ function load() {
 }
 function fresh() {
   return {
-    settings: { newPerDay: 10, ttsRate: 0.9, mastery: 3, useDictApi: true },
+    settings: { newPerDay: 10, ttsRate: 0.9, mastery: 3, useDictApi: true, geminiKey: "", geminiModel: "" },
     batches: {},        // id -> {id,name,created,cards:[{w,m,p,e,h,ipa,audio}],done,doneAt}
     active: null,       // 현재 학습 중 묶음 id
     prog: {},           // "batchId#idx" -> {seen,streak,mastered,iv,due,ef,reps,lapses}
@@ -288,6 +288,71 @@ async function enrichBatch(b) {
   save();
 }
 
+/* ========== 제미나이로 뜻 자동 채우기 (무료 등급) ========== */
+const GEM_BASE = "https://generativelanguage.googleapis.com/v1beta";
+const GEM_SCHEMA = {
+  type: "ARRAY",
+  items: {
+    type: "OBJECT",
+    properties: { w: {type:"STRING"}, m: {type:"STRING"}, p: {type:"STRING"}, e: {type:"STRING"}, h: {type:"STRING"} },
+    required: ["w","m","p","e","h"]
+  }
+};
+
+async function gemPickModel(key) {
+  const r = await fetch(GEM_BASE + "/models?key=" + encodeURIComponent(key));
+  if (!r.ok) {
+    if (r.status === 400 || r.status === 403) throw new Error("KEYBAD");
+    throw new Error("모델 목록을 불러오지 못했습니다 (" + r.status + ")");
+  }
+  const j = await r.json();
+  const usable = (j.models || []).filter(m =>
+    (m.supportedGenerationMethods || []).indexOf("generateContent") >= 0 &&
+    /flash/i.test(m.name) && !/vision|embedding|image|tts|live/i.test(m.name));
+  usable.sort((a, b) => {
+    const s = (n) => (/lite/i.test(n) ? 0 : 1) * 10 + (parseFloat((n.match(/(\d+\.\d+)/) || [0,0])[1]) || 0);
+    return s(b.name) - s(a.name);
+  });
+  if (!usable.length) throw new Error("사용 가능한 모델이 없습니다.");
+  return usable[0].name.replace(/^models\//, "");
+}
+
+async function gemFill(words) {
+  const key = (S.settings.geminiKey || "").trim();
+  if (!key) throw new Error("NOKEY");
+  if (!S.settings.geminiModel) { S.settings.geminiModel = await gemPickModel(key); save(); }
+  const prompt =
+    "다음 영어 단어들의 한국 중·고등학생용 학습 카드를 만들어 주세요.\n\n" +
+    "각 단어마다:\n" +
+    "- w: 주어진 영어 단어 그대로\n" +
+    "- m: 한국어 뜻 1~3개, 쉼표로 구분\n" +
+    "- p: 품사 (동사/명사/형용사/부사 등)\n" +
+    "- e: 그 단어가 들어간 8~12단어의 자연스러운 영어 예문\n" +
+    "- h: 어원 분해나 짧은 연상법, 한국어 40자 이내 (쉬운 단어는 빈 문자열)\n\n" +
+    "단어 목록:\n" + words.join("\n");
+
+  const r = await fetch(GEM_BASE + "/models/" + S.settings.geminiModel + ":generateContent?key=" + encodeURIComponent(key), {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify({
+      contents: [{ parts: [{ text: prompt }] }],
+      generationConfig: { responseMimeType: "application/json", responseSchema: GEM_SCHEMA, temperature: 0.3 },
+    }),
+  });
+  if (!r.ok) {
+    let msg = ""; try { const j = await r.json(); msg = (j.error || {}).message || ""; } catch (e) {}
+    if (r.status === 400 && /API key/i.test(msg)) throw new Error("KEYBAD");
+    if (r.status === 403) throw new Error("KEYBAD");
+    if (r.status === 429) throw new Error("무료 사용량을 다 썼습니다. 잠시 후 다시 시도해 주세요.");
+    if (r.status === 404) { S.settings.geminiModel = ""; save(); throw new Error("모델을 찾지 못했습니다. 다시 시도해 주세요."); }
+    throw new Error("오류 " + r.status + (msg ? " · " + msg : ""));
+  }
+  const j = await r.json();
+  const txt = (((j.candidates || [])[0] || {}).content || {}).parts;
+  if (!txt || !txt.length) throw new Error("응답이 비어 있습니다.");
+  return JSON.parse(txt[0].text);
+}
+
 /* ========== 화면 공통 ========== */
 const app = document.getElementById("app");
 const tabsEl = document.getElementById("tabs");
@@ -384,9 +449,43 @@ function renderConfirmBody() {
       ${rows}
     </div>
     <div class="actions">
+      ${blanks ? `<button class="btn blue" id="gemBtn" onclick="doGemFill()">✨ 제미나이로 뜻 ${blanks}개 자동 채우기</button>` : ""}
       <button class="btn primary" onclick="saveBatch()">이 단어들 외우기 시작</button>
       <button class="btn ghost" onclick="renderPaste()">다시 붙여넣기</button>
     </div>`;
+}
+
+async function doGemFill() {
+  const blanks = CONF.cards.filter(c => !String(c.m || "").trim());
+  if (!blanks.length) return;
+  if (!(S.settings.geminiKey || "").trim()) {
+    alert("설정에서 제미나이 API 키를 먼저 입력해 주세요. 무료로 발급받을 수 있습니다.");
+    go("settings"); return;
+  }
+  const btn = document.getElementById("gemBtn");
+  if (btn) { btn.disabled = true; btn.textContent = "제미나이가 뜻을 만드는 중…"; }
+  try {
+    const got = await gemFill(blanks.map(c => c.w));
+    const byWord = {};
+    for (const g of got) if (g && g.w) byWord[String(g.w).toLowerCase().trim()] = g;
+    let n = 0;
+    for (const c of CONF.cards) {
+      const g = byWord[c.w.toLowerCase().trim()];
+      if (!g || String(c.m || "").trim()) continue;
+      c.m = g.m || ""; c.p = c.p || g.p || ""; c.e = c.e || g.e || ""; c.h = c.h || g.h || "";
+      if (c.m) { S.userDict[c.w.toLowerCase()] = { m: c.m, p: c.p, e: c.e, h: c.h }; n++; }
+    }
+    save();
+    renderConfirmBody();
+    if (!n) alert("뜻을 받지 못했습니다. 다시 시도해 주세요.");
+  } catch (e) {
+    let msg = e.message;
+    if (msg === "NOKEY") msg = "설정에서 제미나이 API 키를 입력해 주세요.";
+    else if (msg === "KEYBAD") msg = "API 키가 올바르지 않습니다. 설정에서 다시 확인해 주세요.";
+    else if (/Failed to fetch|NetworkError/i.test(msg)) msg = "인터넷 연결을 확인해 주세요.";
+    alert(msg);
+    renderConfirmBody();
+  }
 }
 function dicUrl(w) {
   const q = encodeURIComponent(String(w || "").split("/")[0].trim());
@@ -769,6 +868,20 @@ function renderSettings() {
   app.innerHTML = `
     <header class="top"><h1>설정</h1></header>
     <div class="card">
+      <h2>제미나이로 뜻 자동 채우기 <span class="muted">· 무료</span></h2>
+      ${S.settings.geminiKey
+        ? `<div class="ok-notice">키가 등록되어 있습니다${S.settings.geminiModel ? " · " + esc(S.settings.geminiModel) : ""}</div>`
+        : `<p class="muted" style="margin-bottom:9px">단어 확인 화면에서 <b>뜻을 한 번에 채워주는</b> 기능입니다.
+           구글 AI 스튜디오에서 <b>신용카드 없이</b> 무료로 키를 받을 수 있습니다.</p>`}
+      <input type="password" id="gemKeyIn" placeholder="AIza..." style="width:100%">
+      <div class="actions" style="margin-top:10px">
+        <button class="btn primary" onclick="saveGemKey()">키 저장</button>
+        ${S.settings.geminiKey ? `<button class="btn ghost" onclick="clearGemKey()">키 삭제</button>` : ""}
+      </div>
+      <p class="muted" style="margin-top:10px">키는 이 기기 안에만 저장됩니다.
+      <a href="https://aistudio.google.com/apikey" target="_blank" rel="noopener" style="color:var(--accent)">무료 키 발급받기 →</a></p>
+    </div>
+    <div class="card">
       <h2>학습</h2>
       <div class="setting-row"><span>하루 새 단어 <span class="muted">(10~20 권장)</span></span>
         <select onchange="S.settings.newPerDay=+this.value;save()">
@@ -790,6 +903,25 @@ function renderSettings() {
       <div class="setting-row"><span>학습 기록 복사</span><button class="btn ghost" style="width:auto;padding:8px 14px;font-size:14px" onclick="exportData()">복사</button></div>
       <div class="setting-row"><span class="muted">모든 기록 삭제</span><button class="danger-link" onclick="resetAll()">초기화</button></div>
     </div>`;
+}
+async function saveGemKey() {
+  const el = document.getElementById("gemKeyIn");
+  const v = (el ? el.value : "").trim();
+  if (!v) { alert("키를 입력해 주세요."); return; }
+  const btn = document.querySelector('button[onclick="saveGemKey()"]');
+  if (btn) { btn.disabled = true; btn.textContent = "확인 중…"; }
+  try {
+    const model = await gemPickModel(v);
+    S.settings.geminiKey = v; S.settings.geminiModel = model; save();
+    renderSettings();
+    alert("연결됐습니다. 이제 단어 확인 화면에서 뜻을 자동으로 채울 수 있습니다.");
+  } catch (e) {
+    alert(e.message === "KEYBAD" ? "키가 올바르지 않습니다. 다시 확인해 주세요." : e.message);
+    renderSettings();
+  }
+}
+function clearGemKey() {
+  if (confirm("저장된 제미나이 키를 삭제할까요?")) { S.settings.geminiKey = ""; S.settings.geminiModel = ""; save(); renderSettings(); }
 }
 function exportData() { navigator.clipboard.writeText(localStorage.getItem(KEY) || "").then(() => alert("학습 기록을 클립보드에 복사했습니다.")).catch(() => alert("복사에 실패했습니다.")); }
 function resetAll() { if (confirm("모든 묶음과 학습 기록을 삭제할까요? 되돌릴 수 없습니다.")) { localStorage.removeItem(KEY); S = load(); go("home"); } }
